@@ -350,6 +350,11 @@ input[type=range] {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
 }
 .cal-day-mini.today { border-color: var(--accent); color: var(--accent); font-weight: 700; }
+.cal-day-mini.selected {
+  background: rgba(0,200,255,.18);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(0,200,255,.3);
+}
 .cal-day-mini.has-plan { background: rgba(0,200,255,.08); }
 .cal-day-mini.completed { background: rgba(0,255,157,.1); border-color: rgba(0,255,157,.3); }
 .cal-day-mini.empty { opacity: .3; }
@@ -448,9 +453,26 @@ input[type=range] {
 
 <!-- ════════ PAGE: HOY ════════ -->
 <div id="page-today" class="page active">
+  <!-- Mini calendario semanal navegable -->
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-h">
+      <span class="card-t" id="week-mini-title">📅 Esta semana</span>
+      <div style="display:flex;gap:6px">
+        <button class="h-logout" onclick="changeWeek(-1)">‹</button>
+        <button class="h-logout" onclick="changeWeek(1)">›</button>
+      </div>
+    </div>
+    <div class="cal-week" id="week-mini"></div>
+  </div>
+
   <div class="today-card">
-    <div class="today-date" id="today-date">—</div>
-    <div class="today-phase" id="today-phase">Sin fase</div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+      <div>
+        <div class="today-date" id="today-date">—</div>
+        <div class="today-phase" id="today-phase">Sin fase</div>
+      </div>
+      <button class="h-logout" id="today-btn" onclick="goToToday()" style="display:none">🏠 Hoy</button>
+    </div>
     <div id="today-content" style="margin-top:12px"></div>
     <div id="today-actions" style="margin-top:14px"></div>
   </div>
@@ -472,12 +494,6 @@ input[type=range] {
       <div class="kpi-v" id="kpi-tss-week">—<span class="kpi-u">TSS</span></div>
       <div class="kpi-l">TSS semana</div>
     </div>
-  </div>
-
-  <!-- Mini calendario semanal -->
-  <div class="card">
-    <div class="card-h"><span class="card-t">📅 Semana actual</span></div>
-    <div class="cal-week" id="week-mini"></div>
   </div>
 
   <!-- Comentarios recientes del coach -->
@@ -916,31 +932,78 @@ function showPage(name, btn) {
 }
 
 // ════════════════════════════════════════════════════════════
-//  PÁGINA HOY
+//  PÁGINA HOY (con navegación por días)
 // ════════════════════════════════════════════════════════════
-function renderTodayPage() {
+
+// state.selectedDate guarda el día visible (string YYYY-MM-DD)
+// state.weekStart guarda el lunes de la semana visible
+
+function initTodayPage() {
+  if (!state.selectedDate) state.selectedDate = new Date().toISOString().slice(0,10);
+  if (!state.weekStart) {
+    const t = new Date(); 
+    const dow = t.getDay() || 7;
+    t.setDate(t.getDate() - (dow - 1));
+    state.weekStart = t.toISOString().slice(0,10);
+  }
+}
+
+function changeWeek(delta) {
+  initTodayPage();
+  const d = new Date(state.weekStart + 'T00:00:00');
+  d.setDate(d.getDate() + delta * 7);
+  state.weekStart = d.toISOString().slice(0,10);
+  renderTodayPage();
+}
+
+function goToToday() {
   const today = new Date();
+  const dow = today.getDay() || 7;
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - (dow - 1));
+  state.weekStart = monday.toISOString().slice(0,10);
+  state.selectedDate = today.toISOString().slice(0,10);
+  renderTodayPage();
+}
+
+function selectDay(dateStr) {
+  state.selectedDate = dateStr;
+  renderTodayPage();
+}
+
+function renderTodayPage() {
+  initTodayPage();
+
+  const today    = new Date();
   const todayStr = today.toISOString().slice(0,10);
+  const selected = new Date(state.selectedDate + 'T00:00:00');
+  const selStr   = state.selectedDate;
+
   const months = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
   const days = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
-  document.getElementById('today-date').textContent = days[today.getDay()] + ', ' + today.getDate() + ' ' + months[today.getMonth()];
 
-  // Workouts planificados para hoy
-  const todayWorkouts = (state.workouts || []).filter(w => w.fecha === todayStr);
-  // Eventos planificados (del calendario)
-  const todayCals = (state.calEvents || []).filter(e => {
-    // El calendario guarda dayKey como "Mes-Año-DD"
-    return e.fecha === todayStr;
-  });
+  // Etiqueta del día seleccionado
+  let dateLabel = days[selected.getDay()] + ', ' + selected.getDate() + ' ' + months[selected.getMonth()];
+  if (selStr === todayStr) dateLabel = '🔥 HOY · ' + dateLabel;
+  document.getElementById('today-date').textContent = dateLabel;
 
-  // Fase del día (extraída del calendario si existe)
-  const phaseEvt = todayCals.find(e => e.fase);
-  document.getElementById('today-phase').textContent = phaseEvt ? 'Fase: ' + phaseEvt.fase + (phaseEvt.rpe ? ' · RPE ' + phaseEvt.rpe : '') : 'Sin fase asignada';
+  // Botón "Volver a hoy" visible si no es hoy
+  document.getElementById('today-btn').style.display = (selStr === todayStr) ? 'none' : '';
+
+  // Workouts y eventos del día seleccionado
+  const dayWorkouts = (state.workouts || []).filter(w => w.fecha === selStr);
+  const dayCals = (state.calEvents || []).filter(e => e.fecha === selStr);
+
+  // Fase
+  const phaseEvt = dayCals.find(e => e.fase);
+  document.getElementById('today-phase').textContent = phaseEvt
+    ? 'Fase: ' + phaseEvt.fase + (phaseEvt.rpe ? ' · RPE ' + phaseEvt.rpe : '')
+    : 'Sin fase asignada';
 
   // Workouts del día
   let html = '';
-  if (todayWorkouts.length) {
-    todayWorkouts.forEach(w => {
+  if (dayWorkouts.length) {
+    dayWorkouts.forEach(w => {
       const completed = w.comp && (w.comp.tss || w.comp.dur);
       const discE = { swim:'🏊', bike:'🚴', run:'🏃', brick:'🔥', gym:'💪' }[w.disc] || '⚡';
       html += `<div class="workout-item" onclick="openWorkoutDetail('${w.id}')">
@@ -952,8 +1015,8 @@ function renderTodayPage() {
         <span class="workout-status ${completed ? '' : 'pending'}">${completed ? 'Completado' : 'Pendiente'}</span>
       </div>`;
     });
-  } else if (todayCals.length) {
-    todayCals.forEach(e => {
+  } else if (dayCals.length) {
+    dayCals.forEach(e => {
       if (e.sessions) {
         try {
           const sess = typeof e.sessions === 'string' ? JSON.parse(e.sessions) : e.sessions;
@@ -974,35 +1037,49 @@ function renderTodayPage() {
       }
     });
   }
+
+  const isFuture = selStr > todayStr;
+  const isPast   = selStr < todayStr;
+  const emptyMsg = isFuture
+    ? '😴 Día de descanso programado'
+    : isPast
+      ? '📭 Sin entreno registrado este día'
+      : '😎 Día libre o sin plan asignado';
+
   document.getElementById('today-content').innerHTML = html ||
-    '<div class="today-empty">😎 Día de descanso o sin plan asignado</div>';
+    '<div class="today-empty">' + emptyMsg + '</div>';
 
-  // Acciones rápidas
-  let actHtml = '<div style="display:flex;gap:8px;margin-top:10px">';
-  const wellnessToday = state.wellness.find(w => w.fecha === todayStr);
-  if (!wellnessToday) {
-    actHtml += '<button class="btn btn-p" style="flex:1;font-size:13px;padding:10px" onclick="document.querySelector(\'.nav-item:nth-child(2)\').click()">💚 Registrar wellness</button>';
+  // Acciones rápidas (solo para hoy)
+  if (selStr === todayStr) {
+    let actHtml = '<div style="display:flex;gap:8px;margin-top:10px">';
+    const wellnessToday = state.wellness.find(w => w.fecha === todayStr);
+    if (!wellnessToday) {
+      actHtml += '<button class="btn btn-p" style="flex:1;font-size:13px;padding:10px" onclick="document.querySelector(\'.nav-item:nth-child(2)\').click()">💚 Registrar wellness</button>';
+    }
+    actHtml += '<button class="btn btn-s" style="flex:1;font-size:13px;padding:10px" onclick="document.querySelector(\'.nav-item:nth-child(3)\').click()">⚡ Nueva sesión</button>';
+    actHtml += '</div>';
+    document.getElementById('today-actions').innerHTML = actHtml;
+  } else {
+    document.getElementById('today-actions').innerHTML = '';
   }
-  actHtml += '<button class="btn btn-s" style="flex:1;font-size:13px;padding:10px" onclick="document.querySelector(\'.nav-item:nth-child(3)\').click()">⚡ Nueva sesión</button>';
-  actHtml += '</div>';
-  document.getElementById('today-actions').innerHTML = actHtml;
 
-  // KPIs semanales
-  const weekStart = new Date(today);
-  weekStart.setDate(today.getDate() - ((today.getDay() || 7) - 1));
-  const weekStartStr = weekStart.toISOString().slice(0,10);
+  // KPIs SEMANALES (de la semana visible)
+  const weekStartStr = state.weekStart;
+  const wsDate = new Date(weekStartStr + 'T00:00:00');
+  const weekEnd = new Date(wsDate); weekEnd.setDate(wsDate.getDate() + 6);
+  const weekEndStr = weekEnd.toISOString().slice(0,10);
 
   let weekUA = 0, weekTSS = 0, weekSessions = 0;
   ['swim','bike','run'].forEach(d => {
     (state.sessions[d] || []).forEach(s => {
-      if (s.fecha >= weekStartStr) {
+      if (s.fecha >= weekStartStr && s.fecha <= weekEndStr) {
         weekUA += +s.ua || 0;
         weekSessions++;
       }
     });
   });
   state.workouts.forEach(w => {
-    if (w.fecha >= weekStartStr && w.comp && w.comp.tss) {
+    if (w.fecha >= weekStartStr && w.fecha <= weekEndStr && w.comp && w.comp.tss) {
       weekTSS += +w.comp.tss || 0;
     }
   });
@@ -1010,7 +1087,7 @@ function renderTodayPage() {
   document.getElementById('kpi-week-sessions').textContent = weekSessions;
   document.getElementById('kpi-tss-week').innerHTML      = Math.round(weekTSS) + '<span class="kpi-u">TSS</span>';
 
-  // Racha de wellness
+  // Racha de wellness (desde hoy hacia atrás)
   let streak = 0;
   for (let i = 0; i < 30; i++) {
     const d = new Date(today); d.setDate(today.getDate() - i);
@@ -1020,7 +1097,6 @@ function renderTodayPage() {
   }
   document.getElementById('kpi-streak').textContent = streak;
 
-  // Mini calendario semanal
   renderWeekMini();
 
   // Mensajes del coach
@@ -1033,31 +1109,49 @@ function renderTodayPage() {
         <div>${c.text}</div>
       </div>`
     ).join('');
+  } else {
+    document.getElementById('recent-coach-card').style.display = 'none';
   }
 }
 
 function renderWeekMini() {
-  const today = new Date();
-  const monday = new Date(today);
-  monday.setDate(today.getDate() - ((today.getDay() || 7) - 1));
+  initTodayPage();
+  const today = new Date().toISOString().slice(0,10);
+  const monday = new Date(state.weekStart + 'T00:00:00');
   const days = ['L','M','X','J','V','S','D'];
+  const months = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
+
+  // Título con rango de la semana
+  const lblL = monday.getDate() + ' ' + months[monday.getMonth()];
+  const lblR = sunday.getDate() + ' ' + months[sunday.getMonth()];
+  document.getElementById('week-mini-title').textContent = '📅 ' + lblL + ' – ' + lblR;
+
   let html = '';
   for (let i = 0; i < 7; i++) {
     const d = new Date(monday); d.setDate(monday.getDate() + i);
     const ds = d.toISOString().slice(0,10);
-    const isToday = d.toDateString() === today.toDateString();
-    const hasPlan = state.workouts.some(w => w.fecha === ds) ||
-                    state.calEvents.some(e => e.fecha === ds && (e.sessions || e.nota));
-    const sessionDone = state.workouts.some(w => w.fecha === ds && w.comp && w.comp.tss) ||
+    const isToday    = ds === today;
+    const isSelected = ds === state.selectedDate;
+    const dayWk = state.workouts.filter(w => w.fecha === ds);
+    const hasPlan = dayWk.length > 0 || state.calEvents.some(e => e.fecha === ds && (e.sessions || e.nota));
+    const sessionDone = dayWk.some(w => w.comp && w.comp.tss) ||
                         Object.values(state.sessions).flat().some(s => s.fecha === ds);
+    // Emoji de disciplina si hay workout
+    let discE = '';
+    if (dayWk.length) {
+      const map = { swim:'🏊', bike:'🚴', run:'🏃', brick:'🔥', gym:'💪' };
+      discE = map[dayWk[0].disc] || '⚡';
+    }
     let cls = 'cal-day-mini';
     if (isToday) cls += ' today';
+    if (isSelected) cls += ' selected';
     if (sessionDone) cls += ' completed';
     else if (hasPlan) cls += ' has-plan';
-    html += `<div class="${cls}">
-      <div>${days[i]}</div>
-      <div style="font-family:'Rajdhani',sans-serif;font-weight:700">${d.getDate()}</div>
-      ${sessionDone ? '<div class="cal-day-emoji">✓</div>' : (hasPlan ? '<div class="cal-day-emoji">●</div>' : '')}
+    html += `<div class="${cls}" onclick="selectDay('${ds}')">
+      <div style="font-size:9px;color:var(--text-low);font-weight:600">${days[i]}</div>
+      <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px;margin-top:2px">${d.getDate()}</div>
+      ${discE ? `<div class="cal-day-emoji" style="font-size:12px">${discE}</div>` : (sessionDone ? '<div class="cal-day-emoji">✓</div>' : '')}
     </div>`;
   }
   document.getElementById('week-mini').innerHTML = html;
