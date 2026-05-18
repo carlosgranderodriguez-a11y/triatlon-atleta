@@ -782,6 +782,15 @@ input[type=range] {
 // ════════════════════════════════════════════════════════════
 //  CONFIG — debe coincidir con el coach
 // ════════════════════════════════════════════════════════════
+// Helpers de fecha en hora local (evita el bug UTC con toISOString)
+function localDateStr(d) {
+  d = d || new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return yyyy + '-' + mm + '-' + dd;
+}
+
 const CONFIG = {
   APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxLhbUUE5pLXgZkK1BmT5d_sMAI10u_EcTxCgKbGpowIcbhwACKkTzsWy7XA3ML95Ql/exec',
 };
@@ -939,12 +948,12 @@ function showPage(name, btn) {
 // state.weekStart guarda el lunes de la semana visible
 
 function initTodayPage() {
-  if (!state.selectedDate) state.selectedDate = new Date().toISOString().slice(0,10);
+  if (!state.selectedDate) state.selectedDate = localDateStr();
   if (!state.weekStart) {
     const t = new Date(); 
     const dow = t.getDay() || 7;
     t.setDate(t.getDate() - (dow - 1));
-    state.weekStart = t.toISOString().slice(0,10);
+    state.weekStart = localDateStr(t);
   }
 }
 
@@ -952,7 +961,7 @@ function changeWeek(delta) {
   initTodayPage();
   const d = new Date(state.weekStart + 'T00:00:00');
   d.setDate(d.getDate() + delta * 7);
-  state.weekStart = d.toISOString().slice(0,10);
+  state.weekStart = localDateStr(d);
   renderTodayPage();
 }
 
@@ -961,8 +970,8 @@ function goToToday() {
   const dow = today.getDay() || 7;
   const monday = new Date(today);
   monday.setDate(today.getDate() - (dow - 1));
-  state.weekStart = monday.toISOString().slice(0,10);
-  state.selectedDate = today.toISOString().slice(0,10);
+  state.weekStart = localDateStr(monday);
+  state.selectedDate = localDateStr(today);
   renderTodayPage();
 }
 
@@ -975,7 +984,7 @@ function renderTodayPage() {
   initTodayPage();
 
   const today    = new Date();
-  const todayStr = today.toISOString().slice(0,10);
+  const todayStr = localDateStr(today);
   const selected = new Date(state.selectedDate + 'T00:00:00');
   const selStr   = state.selectedDate;
 
@@ -1067,7 +1076,7 @@ function renderTodayPage() {
   const weekStartStr = state.weekStart;
   const wsDate = new Date(weekStartStr + 'T00:00:00');
   const weekEnd = new Date(wsDate); weekEnd.setDate(wsDate.getDate() + 6);
-  const weekEndStr = weekEnd.toISOString().slice(0,10);
+  const weekEndStr = weekEnlocalDateStr(d);
 
   let weekUA = 0, weekTSS = 0, weekSessions = 0;
   ['swim','bike','run'].forEach(d => {
@@ -1091,7 +1100,7 @@ function renderTodayPage() {
   let streak = 0;
   for (let i = 0; i < 30; i++) {
     const d = new Date(today); d.setDate(today.getDate() - i);
-    const ds = d.toISOString().slice(0,10);
+    const ds = localDateStr(d);
     if (state.wellness.find(w => w.fecha === ds)) streak++;
     else break;
   }
@@ -1116,7 +1125,7 @@ function renderTodayPage() {
 
 function renderWeekMini() {
   initTodayPage();
-  const today = new Date().toISOString().slice(0,10);
+  const today = localDateStr(new Date());
   const monday = new Date(state.weekStart + 'T00:00:00');
   const days = ['L','M','X','J','V','S','D'];
   const months = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
@@ -1130,7 +1139,7 @@ function renderWeekMini() {
   let html = '';
   for (let i = 0; i < 7; i++) {
     const d = new Date(monday); d.setDate(monday.getDate() + i);
-    const ds = d.toISOString().slice(0,10);
+    const ds = localDateStr(d);
     const isToday    = ds === today;
     const isSelected = ds === state.selectedDate;
     const dayWk = state.workouts.filter(w => w.fecha === ds);
@@ -1169,7 +1178,7 @@ function renderWellnessPage() {
   document.getElementById('w-today').textContent = today.toLocaleDateString('es', {weekday:'long', day:'numeric', month:'short'});
 
   // Pre-rellenar si ya hay registro de hoy
-  const todayStr = today.toISOString().slice(0,10);
+  const todayStr = localDateStr(today);
   const existing = state.wellness.find(w => w.fecha === todayStr);
   if (existing) {
     ['sueno','energia','fatiga','mental','dolor'].forEach(k => {
@@ -1213,7 +1222,7 @@ function renderWellnessChart() {
   const data = [];
   for (let i=days-1; i>=0; i--) {
     const d = new Date(); d.setDate(d.getDate()-i);
-    const ds = d.toISOString().slice(0,10);
+    const ds = localDateStr(d);
     const e = state.wellness.find(x => x.fecha === ds);
     data.push({
       lbl: ds.slice(5),
@@ -1271,7 +1280,7 @@ function renderWellnessChart() {
 
 async function saveWellness() {
   const entry = {
-    fecha:   new Date().toISOString().slice(0,10),
+    fecha:   localDateStr(),
     sueno:   +document.querySelector('input[oninput*="sueno"]').value,
     energia: +document.querySelector('input[oninput*="energia"]').value,
     fatiga:  +document.querySelector('input[oninput*="fatiga"]').value,
@@ -1311,7 +1320,7 @@ function renderSessionPage() {
   const today = new Date();
   document.getElementById('s-today').textContent = today.toLocaleDateString('es', {weekday:'long', day:'numeric', month:'short'});
   if (!document.getElementById('s-fecha').value) {
-    document.getElementById('s-fecha').value = today.toISOString().slice(0,10);
+    document.getElementById('s-fecha').value = localDateStr(today);
   }
 
   // Historial agrupado por día
@@ -1427,7 +1436,7 @@ function renderPlanPage() {
   let html = '';
   for (let i = 0; i < 7; i++) {
     const d = new Date(monday); d.setDate(monday.getDate() + i);
-    const ds = d.toISOString().slice(0,10);
+    const ds = localDateStr(d);
     const isToday = d.toDateString() === today.toDateString();
 
     const workouts = state.workouts.filter(w => w.fecha === ds);
@@ -1483,7 +1492,7 @@ function renderPlanPage() {
   document.getElementById('plan-days').innerHTML = html;
 
   // Próximas competiciones
-  const todayStr = today.toISOString().slice(0,10);
+  const todayStr = localDateStr(today);
   const comps = state.calEvents.filter(e => e.comp_name && e.fecha >= todayStr)
     .sort((a,b) => a.fecha.localeCompare(b.fecha)).slice(0,3);
   document.getElementById('upcoming-comps').innerHTML = comps.length
