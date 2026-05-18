@@ -1076,7 +1076,7 @@ function renderTodayPage() {
   const weekStartStr = state.weekStart;
   const wsDate = new Date(weekStartStr + 'T00:00:00');
   const weekEnd = new Date(wsDate); weekEnd.setDate(wsDate.getDate() + 6);
-  const weekEndStr = weekEnlocalDateStr(d);
+  const weekEndStr = localDateStr(weekEnd);
 
   let weekUA = 0, weekTSS = 0, weekSessions = 0;
   ['swim','bike','run'].forEach(d => {
