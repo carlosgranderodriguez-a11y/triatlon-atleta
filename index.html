@@ -172,10 +172,10 @@ main { padding: 16px; max-width: 600px; margin: 0 auto; }
   border-radius: 10px; padding: 14px;
 }
 .kpi-v {
-  font-family: 'Rajdhani', sans-serif; font-size: 26px;
-  font-weight: 700; color: var(--text-hi); line-height: 1;
+  font-family: 'Rajdhani', sans-serif; font-size: 24px;
+  font-weight: 700; color: var(--text-mid); line-height: 1;
 }
-.kpi-u { font-size: 13px; color: var(--text-mid); margin-left: 3px; }
+.kpi-u { font-size: 12px; color: var(--text-low); margin-left: 3px; }
 .kpi-l {
   font-size: 10px; color: var(--text-low); letter-spacing: 1px;
   text-transform: uppercase; margin-top: 4px;
@@ -479,20 +479,20 @@ input[type=range] {
 
   <div class="kpi-grid">
     <div class="kpi">
-      <div class="kpi-v" id="kpi-week-load">—<span class="kpi-u">UA</span></div>
-      <div class="kpi-l">Carga semanal</div>
-    </div>
-    <div class="kpi">
       <div class="kpi-v" id="kpi-week-sessions">—</div>
       <div class="kpi-l">Sesiones semana</div>
     </div>
     <div class="kpi">
-      <div class="kpi-v" id="kpi-streak">—</div>
-      <div class="kpi-l">Racha (días)</div>
-    </div>
-    <div class="kpi">
       <div class="kpi-v" id="kpi-tss-week">—<span class="kpi-u">TSS</span></div>
       <div class="kpi-l">TSS semana</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-v" id="kpi-week-hours">—<span class="kpi-u">h</span></div>
+      <div class="kpi-l">Horas semana</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-v" id="kpi-streak">—</div>
+      <div class="kpi-l">Racha wellness</div>
     </div>
   </div>
 
@@ -723,11 +723,91 @@ input[type=range] {
       <button onclick="closeWorkoutDetail()" style="font-size:16px;padding:4px 12px;border-radius:6px;background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--text-mid);cursor:pointer">✕</button>
     </div>
 
+    <!-- Datos del PLAN -->
+    <div style="background:rgba(0,200,255,.05);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:12px">
+      <div style="font-size:10px;color:var(--text-low);letter-spacing:1px;margin-bottom:6px">📋 PLANIFICADO</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center">
+        <div>
+          <div style="font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;color:var(--accent)" id="wkd-plan-dur">—</div>
+          <div style="font-size:9px;color:var(--text-low);letter-spacing:1px">DURACIÓN</div>
+        </div>
+        <div>
+          <div style="font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;color:var(--accent)" id="wkd-plan-dist">—</div>
+          <div style="font-size:9px;color:var(--text-low);letter-spacing:1px">DIST.</div>
+        </div>
+        <div>
+          <div style="font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;color:var(--accent)" id="wkd-plan-tss">—</div>
+          <div style="font-size:9px;color:var(--text-low);letter-spacing:1px">TSS</div>
+        </div>
+        <div>
+          <div style="font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;color:var(--accent)" id="wkd-plan-rpe">—</div>
+          <div style="font-size:9px;color:var(--text-low);letter-spacing:1px">RPE</div>
+        </div>
+      </div>
+    </div>
+
     <!-- Descripción del coach -->
-    <div id="wkd-desc-box" style="background:rgba(0,200,255,.05);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;line-height:1.5"></div>
+    <div id="wkd-desc-box" style="background:rgba(0,200,255,.05);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;line-height:1.5;white-space:pre-wrap"></div>
 
     <!-- Comentario pre del coach -->
     <div id="wkd-comm-pre-box"></div>
+
+    <!-- DATOS COMPLETADOS (visible si ya está marcado) -->
+    <div id="wkd-completed-box" style="display:none;background:rgba(0,255,157,.06);border:1px solid rgba(0,255,157,.25);border-radius:8px;padding:12px;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="font-size:11px;color:var(--accent3);letter-spacing:1px">✅ COMPLETADO</div>
+        <button onclick="toggleCompletedEdit()" style="font-size:10px;padding:3px 10px;border-radius:6px;background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--text-mid);cursor:pointer">✏️ Editar</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;font-size:12px" id="wkd-completed-view"></div>
+    </div>
+
+    <!-- FORMULARIO DE COMPLETADO / EDICIÓN -->
+    <div id="wkd-form-box" style="display:none;background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:14px">
+      <div style="font-size:11px;color:var(--accent);letter-spacing:1px;margin-bottom:10px" id="wkd-form-title">⚡ REGISTRAR RESULTADO</div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div>
+          <label style="font-size:10px;color:var(--text-low);letter-spacing:1px;display:block;margin-bottom:3px">Tiempo (h:mm:ss)</label>
+          <input class="form-i" type="text" id="wkd-comp-dur" placeholder="0:45:00" style="padding:8px 10px">
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--text-low);letter-spacing:1px;display:block;margin-bottom:3px"><span id="wkd-comp-dist-l">Distancia (km)</span></label>
+          <input class="form-i" type="text" id="wkd-comp-dist" placeholder="" style="padding:8px 10px">
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div>
+          <label style="font-size:10px;color:var(--text-low);letter-spacing:1px;display:block;margin-bottom:3px">Pace medio</label>
+          <input class="form-i" type="text" id="wkd-comp-pace" placeholder="4:55" style="padding:8px 10px">
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--text-low);letter-spacing:1px;display:block;margin-bottom:3px">FC media (bpm)</label>
+          <input class="form-i" type="number" id="wkd-comp-fc" placeholder="155" style="padding:8px 10px">
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div>
+          <label style="font-size:10px;color:var(--text-low);letter-spacing:1px;display:block;margin-bottom:3px">RPE (1-10)</label>
+          <input class="form-i" type="number" min="1" max="10" id="wkd-comp-rpe" placeholder="6" style="padding:8px 10px">
+        </div>
+        <div id="wkd-comp-power-wrap" style="display:none">
+          <label style="font-size:10px;color:var(--text-low);letter-spacing:1px;display:block;margin-bottom:3px">Potencia NP (W)</label>
+          <input class="form-i" type="number" id="wkd-comp-power" placeholder="220" style="padding:8px 10px">
+        </div>
+      </div>
+
+      <div style="margin-bottom:10px">
+        <label style="font-size:10px;color:var(--text-low);letter-spacing:1px;display:block;margin-bottom:3px">Sensaciones / Notas</label>
+        <textarea class="form-ta" id="wkd-comp-notes" placeholder="Cómo te has sentido, condiciones, qué tal aductor/abdomen..." style="min-height:60px"></textarea>
+      </div>
+
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-s" onclick="cancelCompletedForm()" style="flex:1;font-size:12px;padding:10px">Cancelar</button>
+        <button class="btn btn-p" onclick="saveCompletedForm()" style="flex:2;font-size:12px;padding:10px">💾 Guardar resultado</button>
+      </div>
+    </div>
 
     <!-- Comentarios entre coach y atleta -->
     <div style="margin-bottom:14px">
@@ -740,8 +820,8 @@ input[type=range] {
       </div>
     </div>
 
-    <!-- Marcar completado / añadir resultados -->
-    <button class="btn btn-p" onclick="markWorkoutCompleted()" id="wkd-mark-btn">✓ Marcar como completado</button>
+    <!-- Botón principal: abre el formulario -->
+    <button class="btn btn-p" onclick="openCompletedForm()" id="wkd-mark-btn">⚡ Registrar resultado del entreno</button>
   </div>
 </div>
 
@@ -1072,29 +1152,47 @@ function renderTodayPage() {
     document.getElementById('today-actions').innerHTML = '';
   }
 
-  // KPIs SEMANALES (de la semana visible)
+  // KPIs SEMANALES (de la semana visible) — muestran "realizado/planificado"
   const weekStartStr = state.weekStart;
   const wsDate = new Date(weekStartStr + 'T00:00:00');
   const weekEnd = new Date(wsDate); weekEnd.setDate(wsDate.getDate() + 6);
   const weekEndStr = localDateStr(weekEnd);
 
-  let weekUA = 0, weekTSS = 0, weekSessions = 0;
-  ['swim','bike','run'].forEach(d => {
-    (state.sessions[d] || []).forEach(s => {
-      if (s.fecha >= weekStartStr && s.fecha <= weekEndStr) {
-        weekUA += +s.ua || 0;
-        weekSessions++;
-      }
-    });
-  });
-  state.workouts.forEach(w => {
-    if (w.fecha >= weekStartStr && w.fecha <= weekEndStr && w.comp && w.comp.tss) {
-      weekTSS += +w.comp.tss || 0;
-    }
-  });
-  document.getElementById('kpi-week-load').innerHTML     = Math.round(weekUA) + '<span class="kpi-u">UA</span>';
-  document.getElementById('kpi-week-sessions').textContent = weekSessions;
-  document.getElementById('kpi-tss-week').innerHTML      = Math.round(weekTSS) + '<span class="kpi-u">TSS</span>';
+  // Helper para parsear duración "h:mm:ss" o "mm:ss" → minutos
+  const parseMin = (str) => {
+    if (!str) return 0;
+    const p = String(str).split(':').map(Number);
+    if (p.length === 3) return p[0]*60 + p[1] + p[2]/60;
+    if (p.length === 2) return p[0] + p[1]/60;
+    return parseFloat(str) || 0;
+  };
+
+  // Workouts planificados de la semana
+  const weekWorkouts = state.workouts.filter(w =>
+    w.fecha >= weekStartStr && w.fecha <= weekEndStr
+  );
+  const plannedSessions = weekWorkouts.length;
+  const completedSessions = weekWorkouts.filter(w => w.comp && (w.comp.tss || w.comp.dur || w.comp.time)).length;
+
+  const plannedTSS = weekWorkouts.reduce((s,w) => s + (parseFloat(w.plan?.tss) || 0), 0);
+  const completedTSS = weekWorkouts.reduce((s,w) =>
+    s + (w.comp && w.comp.tss ? parseFloat(w.comp.tss) || 0 : 0), 0);
+
+  const plannedMin = weekWorkouts.reduce((s,w) => s + parseMin(w.plan?.dur), 0);
+  const completedMin = weekWorkouts.reduce((s,w) =>
+    s + parseMin(w.comp?.dur || w.comp?.time), 0);
+
+  // Renderizar formato "realizado/planificado"
+  document.getElementById('kpi-week-sessions').innerHTML =
+    `<span style="color:var(--accent3)">${completedSessions}</span>/${plannedSessions}`;
+
+  document.getElementById('kpi-tss-week').innerHTML =
+    `<span style="color:var(--accent3)">${Math.round(completedTSS)}</span>/${Math.round(plannedTSS)}<span class="kpi-u">TSS</span>`;
+
+  const completedH = (completedMin / 60).toFixed(1);
+  const plannedH = (plannedMin / 60).toFixed(1);
+  document.getElementById('kpi-week-hours').innerHTML =
+    `<span style="color:var(--accent3)">${completedH}</span>/${plannedH}<span class="kpi-u">h</span>`;
 
   // Racha de wellness (desde hoy hacia atrás)
   let streak = 0;
@@ -1570,8 +1668,13 @@ function openWorkoutDetail(workoutId) {
 
   const discE = { swim:'🏊', bike:'🚴', run:'🏃', brick:'🔥', gym:'💪' }[w.disc] || '⚡';
   document.getElementById('wkd-name').textContent = discE + ' ' + (w.name || 'Sesión');
-  document.getElementById('wkd-meta').textContent =
-    (w.fecha || '') + ' · Plan: ' + (w.plan?.dur || '—') + ' · ' + (w.plan?.tss || 0) + ' TSS';
+  document.getElementById('wkd-meta').textContent = (w.fecha || '');
+
+  // Datos del plan
+  document.getElementById('wkd-plan-dur').textContent  = w.plan?.dur  || '—';
+  document.getElementById('wkd-plan-dist').textContent = w.plan?.dist ? (w.disc === 'swim' ? w.plan.dist + 'm' : w.plan.dist + 'km') : '—';
+  document.getElementById('wkd-plan-tss').textContent  = w.plan?.tss  || '—';
+  document.getElementById('wkd-plan-rpe').textContent  = w.plan?.rpe  || '—';
 
   // Descripción
   const desc = w.desc || '';
@@ -1589,7 +1692,7 @@ function openWorkoutDetail(workoutId) {
     preBox.innerHTML = '';
   }
 
-  // Comentarios coach/atleta para ese workout
+  // Comentarios
   const comments = state.comments.filter(c => String(c.workout_id) === String(workoutId));
   const commentsBox = document.getElementById('wkd-comments');
   if (comments.length) {
@@ -1602,18 +1705,160 @@ function openWorkoutDetail(workoutId) {
     commentsBox.innerHTML = '<div style="color:var(--text-low);font-size:12px;padding:8px;text-align:center">Sin comentarios aún</div>';
   }
 
-  // Estado
-  const completed = w.comp && (w.comp.tss || w.comp.dur);
-  document.getElementById('wkd-mark-btn').textContent = completed ? '✓ Ya marcado como completado' : '✓ Marcar como completado';
-  document.getElementById('wkd-mark-btn').disabled = completed;
+  // Mostrar/ocultar bloques según estado
+  const completed = w.comp && (w.comp.tss || w.comp.dur || w.comp.time);
+  const completedBox = document.getElementById('wkd-completed-box');
+  const formBox = document.getElementById('wkd-form-box');
+  const mainBtn = document.getElementById('wkd-mark-btn');
+
+  formBox.style.display = 'none';  // formulario oculto por defecto
+
+  if (completed) {
+    // Ya completado: mostrar resumen
+    completedBox.style.display = 'block';
+    mainBtn.style.display = 'none';
+    renderCompletedView(w);
+  } else {
+    // Pendiente: mostrar botón para registrar
+    completedBox.style.display = 'none';
+    mainBtn.style.display = 'block';
+    mainBtn.textContent = '⚡ Registrar resultado del entreno';
+  }
 
   document.getElementById('wk-overlay').style.display = 'block';
   document.body.style.overflow = 'hidden';
 }
 
+function renderCompletedView(w) {
+  const c = w.comp || {};
+  const distUnit = w.disc === 'swim' ? 'm' : 'km';
+  const rows = [
+    ['⏱ Tiempo', c.dur || c.time || '—'],
+    ['📏 Distancia', c.dist ? c.dist + distUnit : '—'],
+    ['⚡ Pace medio', c.pace || '—'],
+    ['❤️ FC media', c.fc_avg || c.fc || '—'],
+    ['💪 RPE', c.rpe || '—'],
+  ];
+  if (w.disc === 'bike' && c.pw_avg) rows.push(['🔋 Potencia NP', c.pw_avg + ' W']);
+
+  let html = rows.map(([l,v]) =>
+    `<div><div style="font-size:9px;color:var(--text-low);letter-spacing:1px">${l}</div>
+     <div style="font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;color:${v==='—' ? 'var(--text-low)' : 'var(--accent3)'}">${v}</div></div>`
+  ).join('');
+
+  if (c.notes) {
+    html += `<div style="grid-column:1 / -1;margin-top:6px;padding-top:8px;border-top:1px solid rgba(0,255,157,.15)">
+      <div style="font-size:9px;color:var(--text-low);letter-spacing:1px;margin-bottom:4px">📝 SENSACIONES</div>
+      <div style="font-size:12px;line-height:1.4;color:var(--text-hi)">${c.notes}</div>
+    </div>`;
+  }
+
+  document.getElementById('wkd-completed-view').innerHTML = html;
+}
+
+function openCompletedForm() {
+  const w = state.workouts.find(x => String(x.id) === String(state.currentWorkoutId));
+  if (!w) return;
+  const formBox = document.getElementById('wkd-form-box');
+  formBox.style.display = 'block';
+  document.getElementById('wkd-form-title').textContent = '⚡ REGISTRAR RESULTADO';
+  document.getElementById('wkd-mark-btn').style.display = 'none';
+
+  // Pre-rellenar con plan
+  document.getElementById('wkd-comp-dur').value  = w.plan?.dur  || '';
+  document.getElementById('wkd-comp-dist').value = w.plan?.dist || '';
+  document.getElementById('wkd-comp-pace').value = w.plan?.pace || '';
+  document.getElementById('wkd-comp-rpe').value  = w.plan?.rpe  || '';
+  document.getElementById('wkd-comp-fc').value    = '';
+  document.getElementById('wkd-comp-power').value = '';
+  document.getElementById('wkd-comp-notes').value = '';
+
+  // Etiqueta distancia
+  document.getElementById('wkd-comp-dist-l').textContent =
+    w.disc === 'swim' ? 'Distancia (m)' : 'Distancia (km)';
+
+  // Mostrar campo potencia solo para bici
+  document.getElementById('wkd-comp-power-wrap').style.display =
+    (w.disc === 'bike' || w.disc === 'brick') ? 'block' : 'none';
+
+  // Scroll al formulario
+  setTimeout(() => formBox.scrollIntoView({behavior:'smooth', block:'center'}), 100);
+}
+
+function toggleCompletedEdit() {
+  const w = state.workouts.find(x => String(x.id) === String(state.currentWorkoutId));
+  if (!w) return;
+  const c = w.comp || {};
+  const formBox = document.getElementById('wkd-form-box');
+  formBox.style.display = 'block';
+  document.getElementById('wkd-form-title').textContent = '✏️ EDITAR RESULTADO';
+
+  // Pre-rellenar con datos completados
+  document.getElementById('wkd-comp-dur').value   = c.dur || c.time || '';
+  document.getElementById('wkd-comp-dist').value  = c.dist || '';
+  document.getElementById('wkd-comp-pace').value  = c.pace || '';
+  document.getElementById('wkd-comp-rpe').value   = c.rpe || '';
+  document.getElementById('wkd-comp-fc').value    = c.fc_avg || c.fc || '';
+  document.getElementById('wkd-comp-power').value = c.pw_avg || '';
+  document.getElementById('wkd-comp-notes').value = c.notes || '';
+
+  document.getElementById('wkd-comp-dist-l').textContent =
+    w.disc === 'swim' ? 'Distancia (m)' : 'Distancia (km)';
+  document.getElementById('wkd-comp-power-wrap').style.display =
+    (w.disc === 'bike' || w.disc === 'brick') ? 'block' : 'none';
+
+  setTimeout(() => formBox.scrollIntoView({behavior:'smooth', block:'center'}), 100);
+}
+
+function cancelCompletedForm() {
+  document.getElementById('wkd-form-box').style.display = 'none';
+  const w = state.workouts.find(x => String(x.id) === String(state.currentWorkoutId));
+  if (w && (w.comp && (w.comp.tss || w.comp.dur || w.comp.time))) {
+    // Ya estaba completado: dejarlo así, ocultar botón
+    document.getElementById('wkd-mark-btn').style.display = 'none';
+  } else {
+    document.getElementById('wkd-mark-btn').style.display = 'block';
+  }
+}
+
+async function saveCompletedForm() {
+  const w = state.workouts.find(x => String(x.id) === String(state.currentWorkoutId));
+  if (!w) return;
+  const dur = document.getElementById('wkd-comp-dur').value.trim();
+  const dist = document.getElementById('wkd-comp-dist').value.trim();
+  if (!dur && !dist) {
+    notify('⚠️ Introduce al menos tiempo o distancia', true);
+    return;
+  }
+  // Auto-calcular TSS estimado si tenemos duración y RPE (igual que UA)
+  const rpe = parseFloat(document.getElementById('wkd-comp-rpe').value) || 0;
+  const minutes = parseTimeToMin(dur);
+  const estTSS = minutes && rpe ? Math.round(minutes * rpe * 0.8) : (w.plan?.tss || 0);
+
+  w.comp = {
+    dur,
+    dist,
+    pace:    document.getElementById('wkd-comp-pace').value.trim(),
+    fc_avg:  parseFloat(document.getElementById('wkd-comp-fc').value) || '',
+    rpe:     rpe || '',
+    pw_avg:  parseFloat(document.getElementById('wkd-comp-power').value) || '',
+    notes:   document.getElementById('wkd-comp-notes').value.trim(),
+    tss:     estTSS,
+  };
+  notify('✅ Resultado guardado');
+  await postData('workout', w);
+
+  // Re-render
+  document.getElementById('wkd-form-box').style.display = 'none';
+  openWorkoutDetail(state.currentWorkoutId);
+  renderTodayPage();
+  renderPlanPage();
+}
+
 function closeWorkoutDetail() {
   document.getElementById('wk-overlay').style.display = 'none';
   document.body.style.overflow = '';
+  document.getElementById('wkd-form-box').style.display = 'none';
   state.currentWorkoutId = null;
 }
 
@@ -1633,20 +1878,9 @@ async function sendComment() {
   openWorkoutDetail(state.currentWorkoutId);  // re-render
 }
 
+// Mantener compatibilidad: si algo aún llama a markWorkoutCompleted
 async function markWorkoutCompleted() {
-  if (!state.currentWorkoutId) return;
-  const w = state.workouts.find(x => String(x.id) === String(state.currentWorkoutId));
-  if (!w) return;
-  // Pre-rellenar comp con plan si está vacío
-  if (!w.comp) w.comp = {};
-  w.comp.dur  = w.comp.dur  || w.plan?.dur;
-  w.comp.dist = w.comp.dist || w.plan?.dist;
-  w.comp.tss  = w.comp.tss  || w.plan?.tss;
-  w.comp.rpe  = w.comp.rpe  || w.plan?.rpe;
-  notify('✅ Workout marcado como completado');
-  await postData('workout', w);
-  closeWorkoutDetail();
-  renderAll();
+  openCompletedForm();
 }
 
 // ════════════════════════════════════════════════════════════
