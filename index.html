@@ -483,8 +483,8 @@ input[type=range] {
       <div class="kpi-l">Sesiones semana</div>
     </div>
     <div class="kpi">
-      <div class="kpi-v" id="kpi-tss-week">—<span class="kpi-u">TSS</span></div>
-      <div class="kpi-l">TSS semana</div>
+      <div class="kpi-v" id="kpi-tss-week">—<span class="kpi-u">UA</span></div>
+      <div class="kpi-l">Carga semana</div>
     </div>
     <div class="kpi">
       <div class="kpi-v" id="kpi-week-hours">—<span class="kpi-u">h</span></div>
@@ -737,7 +737,7 @@ input[type=range] {
         </div>
         <div>
           <div style="font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;color:var(--accent)" id="wkd-plan-tss">—</div>
-          <div style="font-size:9px;color:var(--text-low);letter-spacing:1px">TSS</div>
+          <div style="font-size:9px;color:var(--text-low);letter-spacing:1px">CARGA UA</div>
         </div>
         <div>
           <div style="font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;color:var(--accent)" id="wkd-plan-rpe">—</div>
@@ -787,14 +787,32 @@ input[type=range] {
         </div>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-        <div>
-          <label style="font-size:10px;color:var(--text-low);letter-spacing:1px;display:block;margin-bottom:3px">RPE (1-10)</label>
-          <input class="form-i" type="number" min="1" max="10" id="wkd-comp-rpe" placeholder="6" style="padding:8px 10px">
+      <div id="wkd-comp-power-wrap" style="display:none;margin-bottom:8px">
+        <label style="font-size:10px;color:var(--text-low);letter-spacing:1px;display:block;margin-bottom:3px">Potencia NP (W)</label>
+        <input class="form-i" type="number" id="wkd-comp-power" placeholder="220" style="padding:8px 10px">
+      </div>
+
+      <!-- RPE FÍSICO -->
+      <div style="margin-bottom:12px;background:rgba(239,68,68,.05);border:1px solid rgba(239,68,68,.15);border-radius:8px;padding:10px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+          <span style="font-size:12px;color:var(--text-mid)">💪 RPE Físico <span style="color:var(--text-low);font-size:10px">(esfuerzo)</span></span>
+          <span style="font-size:15px;font-weight:700;color:var(--run)" id="wkd-rpe-fis-val">6/10</span>
         </div>
-        <div id="wkd-comp-power-wrap" style="display:none">
-          <label style="font-size:10px;color:var(--text-low);letter-spacing:1px;display:block;margin-bottom:3px">Potencia NP (W)</label>
-          <input class="form-i" type="number" id="wkd-comp-power" placeholder="220" style="padding:8px 10px">
+        <input type="range" min="1" max="10" value="6" id="wkd-comp-rpe" oninput="document.getElementById('wkd-rpe-fis-val').textContent=this.value+'/10'" style="width:100%;accent-color:var(--run)">
+        <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-low);margin-top:2px">
+          <span>Muy suave</span><span>Máximo</span>
+        </div>
+      </div>
+
+      <!-- RPE MENTAL -->
+      <div style="margin-bottom:12px;background:rgba(0,200,255,.05);border:1px solid rgba(0,200,255,.15);border-radius:8px;padding:10px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+          <span style="font-size:12px;color:var(--text-mid)">🧠 RPE Mental <span style="color:var(--text-low);font-size:10px">(cómo te sentiste)</span></span>
+          <span style="font-size:15px;font-weight:700;color:var(--accent)" id="wkd-rpe-men-val">5/10</span>
+        </div>
+        <input type="range" min="1" max="10" value="5" id="wkd-comp-rpe-mental" oninput="document.getElementById('wkd-rpe-men-val').textContent=this.value+'/10'" style="width:100%;accent-color:var(--accent)">
+        <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-low);margin-top:2px">
+          <span>Costó mucho</span><span>Disfruté</span>
         </div>
       </div>
 
@@ -1172,11 +1190,25 @@ function renderTodayPage() {
     w.fecha >= weekStartStr && w.fecha <= weekEndStr
   );
   const plannedSessions = weekWorkouts.length;
-  const completedSessions = weekWorkouts.filter(w => w.comp && (w.comp.tss || w.comp.dur || w.comp.time)).length;
+  const completedSessions = weekWorkouts.filter(w => w.comp && (w.comp.ua || w.comp.tss || w.comp.dur || w.comp.time)).length;
 
-  const plannedTSS = weekWorkouts.reduce((s,w) => s + (parseFloat(w.plan?.tss) || 0), 0);
-  const completedTSS = weekWorkouts.reduce((s,w) =>
-    s + (w.comp && w.comp.tss ? parseFloat(w.comp.tss) || 0 : 0), 0);
+  // CARGA sRPE de Foster = RPE × minutos (Unidades Arbitrarias)
+  // Planificada: RPE plan × duración plan
+  const plannedUA = weekWorkouts.reduce((s,w) => {
+    const min = parseMin(w.plan?.dur);
+    const rpe = parseFloat(w.plan?.rpe) || 0;
+    return s + (min * rpe);
+  }, 0);
+  // Realizada: usa comp.ua si existe, sino RPE × min realizados
+  const completedUA = weekWorkouts.reduce((s,w) => {
+    if (w.comp && w.comp.ua) return s + parseFloat(w.comp.ua);
+    if (w.comp && (w.comp.dur || w.comp.time)) {
+      const min = parseMin(w.comp.dur || w.comp.time);
+      const rpe = parseFloat(w.comp.rpe_fisico || w.comp.rpe) || 0;
+      return s + (min * rpe);
+    }
+    return s;
+  }, 0);
 
   const plannedMin = weekWorkouts.reduce((s,w) => s + parseMin(w.plan?.dur), 0);
   const completedMin = weekWorkouts.reduce((s,w) =>
@@ -1187,7 +1219,7 @@ function renderTodayPage() {
     `<span style="color:var(--accent3)">${completedSessions}</span>/${plannedSessions}`;
 
   document.getElementById('kpi-tss-week').innerHTML =
-    `<span style="color:var(--accent3)">${Math.round(completedTSS)}</span>/${Math.round(plannedTSS)}<span class="kpi-u">TSS</span>`;
+    `<span style="color:var(--accent3)">${Math.round(completedUA)}</span>/${Math.round(plannedUA)}<span class="kpi-u">UA</span>`;
 
   const completedH = (completedMin / 60).toFixed(1);
   const plannedH = (plannedMin / 60).toFixed(1);
@@ -1673,7 +1705,11 @@ function openWorkoutDetail(workoutId) {
   // Datos del plan
   document.getElementById('wkd-plan-dur').textContent  = w.plan?.dur  || '—';
   document.getElementById('wkd-plan-dist').textContent = w.plan?.dist ? (w.disc === 'swim' ? w.plan.dist + 'm' : w.plan.dist + 'km') : '—';
-  document.getElementById('wkd-plan-tss').textContent  = w.plan?.tss  || '—';
+  // Carga planificada sRPE = RPE × minutos
+  const planMin = (function(){ const s = w.plan?.dur; if(!s) return 0; const p = String(s).split(':').map(Number); if(p.length===3) return p[0]*60+p[1]+p[2]/60; if(p.length===2) return p[0]+p[1]/60; return parseFloat(s)||0; })();
+  const planRpe = parseFloat(w.plan?.rpe) || 0;
+  const planUA = Math.round(planMin * planRpe);
+  document.getElementById('wkd-plan-tss').textContent  = planUA || '—';
   document.getElementById('wkd-plan-rpe').textContent  = w.plan?.rpe  || '—';
 
   // Descripción
@@ -1737,9 +1773,11 @@ function renderCompletedView(w) {
     ['📏 Distancia', c.dist ? c.dist + distUnit : '—'],
     ['⚡ Pace medio', c.pace || '—'],
     ['❤️ FC media', c.fc_avg || c.fc || '—'],
-    ['💪 RPE', c.rpe || '—'],
+    ['💪 RPE Físico', (c.rpe_fisico || c.rpe) ? (c.rpe_fisico || c.rpe) + '/10' : '—'],
+    ['🧠 RPE Mental', c.rpe_mental ? c.rpe_mental + '/10' : '—'],
   ];
-  if (w.disc === 'bike' && c.pw_avg) rows.push(['🔋 Potencia NP', c.pw_avg + ' W']);
+  if ((w.disc === 'bike' || w.disc === 'brick') && c.pw_avg) rows.push(['🔋 Potencia NP', c.pw_avg + ' W']);
+  if (c.ua || c.tss) rows.push(['📊 Carga', Math.round(c.ua || c.tss) + ' UA']);
 
   let html = rows.map(([l,v]) =>
     `<div><div style="font-size:9px;color:var(--text-low);letter-spacing:1px">${l}</div>
@@ -1768,10 +1806,15 @@ function openCompletedForm() {
   document.getElementById('wkd-comp-dur').value  = w.plan?.dur  || '';
   document.getElementById('wkd-comp-dist').value = w.plan?.dist || '';
   document.getElementById('wkd-comp-pace').value = w.plan?.pace || '';
-  document.getElementById('wkd-comp-rpe').value  = w.plan?.rpe  || '';
   document.getElementById('wkd-comp-fc').value    = '';
   document.getElementById('wkd-comp-power').value = '';
   document.getElementById('wkd-comp-notes').value = '';
+  // Sliders RPE
+  const rpeFis = w.plan?.rpe || 6;
+  document.getElementById('wkd-comp-rpe').value = rpeFis;
+  document.getElementById('wkd-rpe-fis-val').textContent = rpeFis + '/10';
+  document.getElementById('wkd-comp-rpe-mental').value = 5;
+  document.getElementById('wkd-rpe-men-val').textContent = '5/10';
 
   // Etiqueta distancia
   document.getElementById('wkd-comp-dist-l').textContent =
@@ -1797,10 +1840,16 @@ function toggleCompletedEdit() {
   document.getElementById('wkd-comp-dur').value   = c.dur || c.time || '';
   document.getElementById('wkd-comp-dist').value  = c.dist || '';
   document.getElementById('wkd-comp-pace').value  = c.pace || '';
-  document.getElementById('wkd-comp-rpe').value   = c.rpe || '';
   document.getElementById('wkd-comp-fc').value    = c.fc_avg || c.fc || '';
   document.getElementById('wkd-comp-power').value = c.pw_avg || '';
   document.getElementById('wkd-comp-notes').value = c.notes || '';
+  // Sliders RPE
+  const rpeFis = c.rpe || c.rpe_fisico || 6;
+  const rpeMen = c.rpe_mental || 5;
+  document.getElementById('wkd-comp-rpe').value = rpeFis;
+  document.getElementById('wkd-rpe-fis-val').textContent = rpeFis + '/10';
+  document.getElementById('wkd-comp-rpe-mental').value = rpeMen;
+  document.getElementById('wkd-rpe-men-val').textContent = rpeMen + '/10';
 
   document.getElementById('wkd-comp-dist-l').textContent =
     w.disc === 'swim' ? 'Distancia (m)' : 'Distancia (km)';
@@ -1830,20 +1879,28 @@ async function saveCompletedForm() {
     notify('⚠️ Introduce al menos tiempo o distancia', true);
     return;
   }
-  // Auto-calcular TSS estimado si tenemos duración y RPE (igual que UA)
-  const rpe = parseFloat(document.getElementById('wkd-comp-rpe').value) || 0;
+  // RPE físico y mental
+  const rpeFisico = parseFloat(document.getElementById('wkd-comp-rpe').value) || 6;
+  const rpeMental = parseFloat(document.getElementById('wkd-comp-rpe-mental').value) || 5;
+
+  // CARGA sRPE de Foster (validada científicamente):
+  //   Carga = RPE (escala CR10) × duración en minutos → Unidades Arbitrarias (UA)
+  //   Foster C. et al. (2001) J Strength Cond Res. Correlación r≈0.75-0.90 con métodos de FC.
   const minutes = parseTimeToMin(dur);
-  const estTSS = minutes && rpe ? Math.round(minutes * rpe * 0.8) : (w.plan?.tss || 0);
+  const cargaUA = minutes && rpeFisico ? Math.round(minutes * rpeFisico) : 0;
 
   w.comp = {
     dur,
     dist,
     pace:    document.getElementById('wkd-comp-pace').value.trim(),
     fc_avg:  parseFloat(document.getElementById('wkd-comp-fc').value) || '',
-    rpe:     rpe || '',
+    rpe:        rpeFisico,    // compat: rpe = rpe físico
+    rpe_fisico: rpeFisico,
+    rpe_mental: rpeMental,
     pw_avg:  parseFloat(document.getElementById('wkd-comp-power').value) || '',
     notes:   document.getElementById('wkd-comp-notes').value.trim(),
-    tss:     estTSS,
+    ua:      cargaUA,    // carga sRPE de Foster
+    tss:     cargaUA,    // compat con código que lee comp.tss
   };
   notify('✅ Resultado guardado');
   await postData('workout', w);
