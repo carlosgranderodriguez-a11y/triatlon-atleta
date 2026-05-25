@@ -1,5 +1,5 @@
 // Service Worker - Mi Triatlón PWA
-const CACHE_VERSION = 'mi-triatlon-v9';
+const CACHE_VERSION = 'mi-triatlon-v10';
 const CACHE_FILES = [
   './',
   './index.html',
