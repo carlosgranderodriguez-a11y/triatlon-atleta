@@ -1653,76 +1653,109 @@ function calcPace(disc, dist, time) {
 // ════════════════════════════════════════════════════════════
 //  PÁGINA PLAN
 // ════════════════════════════════════════════════════════════
-function prevWeek() { state.weekOffset--; renderPlanPage(); }
-function nextWeek() { state.weekOffset++; renderPlanPage(); }
+function prevWeek() { state.weekOffset -= 4; renderPlanPage(); }
+function nextWeek() { state.weekOffset += 4; renderPlanPage(); }
 
 function renderPlanPage() {
   const today = new Date();
+  // Lunes de la semana actual + offset (en bloques de 4 semanas)
   const monday = new Date(today);
   monday.setDate(today.getDate() - ((today.getDay() || 7) - 1) + state.weekOffset * 7);
 
-  const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
+  // Etiqueta del periodo: del lunes inicial al domingo de la 4ª semana
+  const endSunday = new Date(monday); endSunday.setDate(monday.getDate() + 27);
   const months = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
   document.getElementById('plan-week-label').textContent =
-    monday.getDate() + ' ' + months[monday.getMonth()] + ' – ' + sunday.getDate() + ' ' + months[sunday.getMonth()];
+    monday.getDate() + ' ' + months[monday.getMonth()] + ' – ' + endSunday.getDate() + ' ' + months[endSunday.getMonth()];
 
   const days = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
   let html = '';
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(monday); d.setDate(monday.getDate() + i);
-    const ds = localDateStr(d);
-    const isToday = d.toDateString() === today.toDateString();
 
-    const workouts = state.workouts.filter(w => w.fecha === ds);
-    const calEvts = state.calEvents.filter(e => e.fecha === ds);
+  // 4 semanas seguidas
+  for (let week = 0; week < 4; week++) {
+    const weekStart = new Date(monday); weekStart.setDate(monday.getDate() + week * 7);
+    const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6);
 
-    let contents = '';
-    workouts.forEach(w => {
-      const completed = w.comp && (w.comp.tss || w.comp.dur);
-      const discE = { swim:'🏊', bike:'🚴', run:'🏃', brick:'🔥', gym:'💪' }[w.disc] || '⚡';
-      contents += `<div class="workout-item" onclick="openWorkoutDetail('${w.id}')">
-        <div class="workout-disc ${w.disc}">${discE}</div>
-        <div class="workout-info">
-          <div class="workout-name">${w.name || 'Sesión'}</div>
-          <div class="workout-meta">${w.plan?.dur || ''} · ${w.plan?.tss || 0} TSS</div>
-        </div>
-        <span class="workout-status ${completed ? '' : 'pending'}">${completed ? '✓' : '○'}</span>
-      </div>`;
-    });
-    calEvts.forEach(e => {
-      if (e.sessions) {
-        try {
-          const sess = typeof e.sessions === 'string' ? JSON.parse(e.sessions) : e.sessions;
-          Object.entries(sess).forEach(([disc, val]) => {
-            if (val) {
-              const discE = { swim:'🏊', bike:'🚴', run:'🏃', brick:'🔥', gym:'💪' }[disc] || '⚡';
-              contents += `<div class="workout-item">
-                <div class="workout-disc ${disc}">${discE}</div>
-                <div class="workout-info">
-                  <div class="workout-name">${e.nota || 'Sesión planificada'}</div>
-                  <div class="workout-meta">${e.fase || ''} ${e.rpe ? '· RPE '+e.rpe : ''} ${e.ua ? '· '+e.ua+' UA' : ''}</div>
-                </div>
-              </div>`;
-            }
-          });
-        } catch(err) {}
-      }
-      if (e.comp_name) {
-        contents += `<div class="workout-item" style="border-color:rgba(160,80,240,.4);background:rgba(160,80,240,.05)">
-          <div class="workout-disc" style="background:rgba(160,80,240,.15)">🏆</div>
-          <div class="workout-info">
-            <div class="workout-name">${e.comp_name}</div>
-            <div class="workout-meta">${e.comp_tipo || 'Competición'} ${e.comp_lugar ? '· '+e.comp_lugar : ''}</div>
-          </div>
-        </div>`;
-      }
-    });
+    // Calcular carga total de la semana (suma de UA planificadas)
+    let weekUA = 0;
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(weekStart); d.setDate(weekStart.getDate() + i);
+      const ds = localDateStr(d);
+      state.workouts.filter(w => w.fecha === ds).forEach(w => {
+        const dur = w.plan?.dur || '';
+        const rpe = parseFloat(w.plan?.rpe) || 0;
+        const min = (function(){ const p = String(dur).split(':').map(Number); if(p.length===3) return p[0]*60+p[1]+p[2]/60; if(p.length===2) return p[0]+p[1]/60; return parseFloat(dur)||0; })();
+        weekUA += min * rpe;
+      });
+    }
 
-    html += `<div class="hist-day" ${isToday ? 'style="background:rgba(0,200,255,.04);border-radius:10px;padding:8px"' : ''}>
-      <div class="hist-day-h">${days[i]} ${d.getDate()}</div>
-      ${contents || '<div style="font-size:12px;color:var(--text-low);padding:6px 12px">Día libre</div>'}
+    // Cabecera de semana
+    html += `<div style="margin:${week === 0 ? '4px' : '24px'} 0 10px 0;padding:10px 12px;background:linear-gradient(90deg, rgba(0,200,255,.08), rgba(0,200,255,.02));border-radius:10px;border-left:3px solid var(--accent);display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:10px;color:var(--text-low);letter-spacing:1.5px;font-weight:600">SEMANA ${week + 1}</div>
+        <div style="font-size:14px;color:var(--text-hi);font-weight:600;margin-top:2px">${weekStart.getDate()} ${months[weekStart.getMonth()]} – ${weekEnd.getDate()} ${months[weekEnd.getMonth()]}</div>
+      </div>
+      ${weekUA > 0 ? `<div style="text-align:right"><div style="font-size:9px;color:var(--text-low);letter-spacing:1px">CARGA</div><div style="font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700;color:var(--accent3)">${Math.round(weekUA)}</div></div>` : ''}
     </div>`;
+
+    // Días de la semana
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(weekStart); d.setDate(weekStart.getDate() + i);
+      const ds = localDateStr(d);
+      const isToday = d.toDateString() === today.toDateString();
+
+      const workouts = state.workouts.filter(w => w.fecha === ds);
+      const calEvts = state.calEvents.filter(e => e.fecha === ds);
+
+      let contents = '';
+      workouts.forEach(w => {
+        const completed = w.comp && (w.comp.tss || w.comp.dur);
+        const discE = { swim:'🏊', bike:'🚴', run:'🏃', brick:'🔥', gym:'💪' }[w.disc] || '⚡';
+        contents += `<div class="workout-item" onclick="openWorkoutDetail('${w.id}')">
+          <div class="workout-disc ${w.disc}">${discE}</div>
+          <div class="workout-info">
+            <div class="workout-name">${w.name || 'Sesión'}</div>
+            <div class="workout-meta">${w.plan?.dur || ''} · ${w.plan?.tss || 0} TSS</div>
+          </div>
+          <span class="workout-status ${completed ? '' : 'pending'}">${completed ? '✓' : '○'}</span>
+        </div>`;
+      });
+      calEvts.forEach(e => {
+        if (e.sessions) {
+          try {
+            const sess = typeof e.sessions === 'string' ? JSON.parse(e.sessions) : e.sessions;
+            Object.entries(sess).forEach(([disc, val]) => {
+              if (val) {
+                const discE = { swim:'🏊', bike:'🚴', run:'🏃', brick:'🔥', gym:'💪' }[disc] || '⚡';
+                contents += `<div class="workout-item">
+                  <div class="workout-disc ${disc}">${discE}</div>
+                  <div class="workout-info">
+                    <div class="workout-name">${e.nota || 'Sesión planificada'}</div>
+                    <div class="workout-meta">${e.fase || ''} ${e.rpe ? '· RPE '+e.rpe : ''} ${e.ua ? '· '+e.ua+' UA' : ''}</div>
+                  </div>
+                </div>`;
+              }
+            });
+          } catch(err) {}
+        }
+        if (e.comp_name) {
+          contents += `<div class="workout-item" style="border-color:rgba(160,80,240,.4);background:rgba(160,80,240,.05)">
+            <div class="workout-disc" style="background:rgba(160,80,240,.15)">🏆</div>
+            <div class="workout-info">
+              <div class="workout-name">${e.comp_name}</div>
+              <div class="workout-meta">${e.comp_tipo || 'Competición'} ${e.comp_lugar ? '· '+e.comp_lugar : ''}</div>
+            </div>
+          </div>`;
+        }
+      });
+
+      html += `<div class="hist-day" ${isToday ? 'style="background:rgba(0,200,255,.04);border-radius:10px;padding:8px"' : ''}>
+        <div class="hist-day-h">${days[i]} ${d.getDate()}</div>
+        ${contents || '<div style="font-size:12px;color:var(--text-low);padding:6px 12px">Día libre</div>'}
+      </div>`;
+    }
   }
+
   document.getElementById('plan-days').innerHTML = html;
 
   // Próximas competiciones
