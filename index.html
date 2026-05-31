@@ -1216,7 +1216,7 @@ function renderTodayPage() {
   if (dayWorkouts.length) {
     dayWorkouts.forEach(w => {
       const completed = w.comp && (w.comp.tss || w.comp.dur);
-      const discE = { swim:'🏊', bike:'🚴', run:'🏃', brick:'🔥', gym:'💪' }[w.disc] || '⚡';
+      const discE = { swim:'🏊', bike:'🚴', run:'🏃', brick:'🔥', gym:'🏋' }[w.disc] || '⚡';
       html += `<div class="workout-item" onclick="openWorkoutDetail('${w.id}')">
         <div class="workout-disc ${w.disc}">${discE}</div>
         <div class="workout-info">
@@ -1233,7 +1233,7 @@ function renderTodayPage() {
           const sess = typeof e.sessions === 'string' ? JSON.parse(e.sessions) : e.sessions;
           Object.entries(sess).forEach(([d, val]) => {
             if (val) {
-              const discE = { swim:'🏊', bike:'🚴', run:'🏃', brick:'🔥', gym:'💪' }[d] || '⚡';
+              const discE = { swim:'🏊', bike:'🚴', run:'🏃', brick:'🔥', gym:'🏋' }[d] || '⚡';
               html += `<div class="workout-item">
                 <div class="workout-disc ${d}">${discE}</div>
                 <div class="workout-info">
@@ -1383,7 +1383,7 @@ function renderWeekMini() {
     // Emoji de disciplina si hay workout
     let discE = '';
     if (dayWk.length) {
-      const map = { swim:'🏊', bike:'🚴', run:'🏃', brick:'🔥', gym:'💪' };
+      const map = { swim:'🏊', bike:'🚴', run:'🏃', brick:'🔥', gym:'🏋' };
       discE = map[dayWk[0].disc] || '⚡';
     }
     let cls = 'cal-day-mini';
@@ -1710,7 +1710,7 @@ function renderPlanPage() {
       let contents = '';
       workouts.forEach(w => {
         const completed = w.comp && (w.comp.tss || w.comp.dur);
-        const discE = { swim:'🏊', bike:'🚴', run:'🏃', brick:'🔥', gym:'💪' }[w.disc] || '⚡';
+        const discE = { swim:'🏊', bike:'🚴', run:'🏃', brick:'🔥', gym:'🏋' }[w.disc] || '⚡';
         contents += `<div class="workout-item" onclick="openWorkoutDetail('${w.id}')">
           <div class="workout-disc ${w.disc}">${discE}</div>
           <div class="workout-info">
@@ -1726,7 +1726,7 @@ function renderPlanPage() {
             const sess = typeof e.sessions === 'string' ? JSON.parse(e.sessions) : e.sessions;
             Object.entries(sess).forEach(([disc, val]) => {
               if (val) {
-                const discE = { swim:'🏊', bike:'🚴', run:'🏃', brick:'🔥', gym:'💪' }[disc] || '⚡';
+                const discE = { swim:'🏊', bike:'🚴', run:'🏃', brick:'🔥', gym:'🏋' }[disc] || '⚡';
                 contents += `<div class="workout-item">
                   <div class="workout-disc ${disc}">${discE}</div>
                   <div class="workout-info">
@@ -1835,7 +1835,7 @@ function openWorkoutDetail(workoutId) {
   if (!w) { notify('⚠️ Workout no encontrado', true); return; }
   state.currentWorkoutId = workoutId;
 
-  const discE = { swim:'🏊', bike:'🚴', run:'🏃', brick:'🔥', gym:'💪' }[w.disc] || '⚡';
+  const discE = { swim:'🏊', bike:'🚴', run:'🏃', brick:'🔥', gym:'🏋' }[w.disc] || '⚡';
   document.getElementById('wkd-name').textContent = discE + ' ' + (w.name || 'Sesión');
   document.getElementById('wkd-meta').textContent = (w.fecha || '');
 
