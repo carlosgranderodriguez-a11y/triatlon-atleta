@@ -995,6 +995,110 @@ function showApp() {
 // ════════════════════════════════════════════════════════════
 //  CARGAR DATOS
 // ════════════════════════════════════════════════════════════
+
+// Normaliza un workout: rescata el formato bueno cuando las columnas
+// del Sheet están descolocadas (workouts viejos).
+// Convierte fechas que vengan como Date string a YYYY-MM-DD.
+function normalizeWorkout(w) {
+  if (!w || typeof w !== 'object') return w;
+
+  // 1) Si full_json es válido, usarlo como fuente de verdad
+  let parsed = null;
+  if (w.full_json && typeof w.full_json === 'string' && w.full_json.trim().startsWith('{')) {
+    try { parsed = JSON.parse(w.full_json); } catch(e) {}
+  }
+
+  // 2) Si full_json está vacío pero comp_rpe_mental contiene el JSON real (bug columnas descolocadas)
+  if (!parsed && w.comp_rpe_mental && typeof w.comp_rpe_mental === 'string' && w.comp_rpe_mental.trim().startsWith('{')) {
+    try { parsed = JSON.parse(w.comp_rpe_mental); } catch(e) {}
+  }
+
+  // 3) Si conseguimos parsear, usar ese objeto
+  if (parsed) {
+    // Mantener el id correcto (workout_id del Sheet manda si no hay id en el parsed)
+    parsed.id = parsed.id || w.workout_id || w.id;
+    parsed.fecha = parsed.fecha || w.fecha;
+    parsed.athlete = parsed.athlete || w.athlete;
+    w = parsed;
+  } else {
+    // 4) Fallback: reconstruir desde campos planos (workouts antiguos sin full_json válido)
+    if (!w.plan) {
+      w.plan = {
+        dur:  formatDurationField(w.plan_dur),
+        dist: w.plan_dist || '',
+        pace: formatDurationField(w.plan_pace),
+        tss:  w.plan_tss || '',
+        if:   w.plan_if || '',
+        rpe:  w.plan_rpe || '',
+      };
+    }
+    if (!w.comp) {
+      w.comp = {
+        dur:  formatDurationField(w.comp_dur),
+        dist: w.comp_dist || '',
+        pace: formatDurationField(w.comp_pace),
+        tss:  w.comp_tss || '',
+        if:   w.comp_if || '',
+        rpe:  w.comp_rpe || '',
+        fc_avg: w.comp_fc_avg || '',
+        pw_avg: w.comp_pw_avg || '',
+      };
+    }
+    // La descripción real puede estar en notes_priv si las columnas se desplazaron
+    if (!w.desc || (typeof w.desc === 'string' && w.desc.trim().startsWith('['))) {
+      w.desc = w.notes_priv || '';
+    }
+    // Los intervals reales puede que estén como JSON dentro de la columna desc (desplazamiento)
+    if (!w.intervals || !Array.isArray(w.intervals)) {
+      let intervals = [];
+      const candidates = [w.intervals_json, w.desc];
+      for (const cand of candidates) {
+        if (typeof cand === 'string' && cand.trim().startsWith('[')) {
+          try { intervals = JSON.parse(cand); break; } catch(e) {}
+        } else if (Array.isArray(cand)) {
+          intervals = cand; break;
+        }
+      }
+      w.intervals = intervals;
+    }
+    w.id = w.id || w.workout_id;
+  }
+
+  // 5) Normalizar fecha YYYY-MM-DD
+  if (w.fecha && typeof w.fecha === 'string' && w.fecha.length > 10) {
+    w.fecha = w.fecha.slice(0, 10);
+  }
+  if (w.fecha instanceof Date) {
+    const y = w.fecha.getFullYear();
+    const m = String(w.fecha.getMonth() + 1).padStart(2, '0');
+    const d = String(w.fecha.getDate()).padStart(2, '0');
+    w.fecha = y + '-' + m + '-' + d;
+  }
+
+  return w;
+}
+
+// Convierte campos de duración/pace que vienen como Date raros del Sheet
+// (ej. "1899-12-30T01:09:44.000Z") en string legible "HH:MM:SS" o "MM:SS"
+function formatDurationField(v) {
+  if (!v) return '';
+  if (typeof v === 'string' && v.match(/^\d{1,2}:\d{2}/)) return v; // ya es HH:MM o HH:MM:SS
+  if (typeof v === 'string' && v.startsWith('1899-12-30T')) {
+    // Sheet guarda horas como timestamp con base 1899-12-30
+    const m = v.match(/T(\d{2}):(\d{2}):(\d{2})/);
+    if (m) {
+      const h = parseInt(m[1], 10);
+      return (h > 0 ? h + ':' : '') + m[2] + ':' + m[3];
+    }
+  }
+  if (v instanceof Date) {
+    const h = v.getUTCHours(), mm = v.getUTCMinutes(), ss = v.getUTCSeconds();
+    const pad = (n) => String(n).padStart(2, '0');
+    return (h > 0 ? h + ':' : '') + pad(mm) + ':' + pad(ss);
+  }
+  return String(v);
+}
+
 async function loadAllData() {
   if (!state.athlete) return;
   try {
@@ -1005,7 +1109,7 @@ async function loadAllData() {
       state.wellness  = json.data.wellness  || [];
       state.sessions  = json.data.sessions  || { swim:[], bike:[], run:[] };
       state.calEvents = json.data.calEvents || [];
-      state.workouts  = json.data.workouts  || [];
+      state.workouts  = (json.data.workouts || []).map(normalizeWorkout);
       state.comments  = json.data.comments  || [];
       // Refrescar profile
       if (json.data.athletes) {
@@ -1712,10 +1816,37 @@ function openWorkoutDetail(workoutId) {
   document.getElementById('wkd-plan-tss').textContent  = planUA || '—';
   document.getElementById('wkd-plan-rpe').textContent  = w.plan?.rpe  || '—';
 
-  // Descripción
-  const desc = w.desc || '';
+  // Descripción (texto plano) — si el desc por error es JSON crudo, lo ocultamos
+  let desc = w.desc || '';
+  if (typeof desc === 'string' && desc.trim().startsWith('[')) desc = '';
   const descBox = document.getElementById('wkd-desc-box');
-  descBox.innerHTML = desc ? '<div style="font-size:11px;color:var(--text-low);letter-spacing:1px;margin-bottom:6px">📝 DESCRIPCIÓN</div>' + desc.replace(/\n/g,'<br>') : '<div style="color:var(--text-low);font-style:italic">Sin descripción</div>';
+  let descHtml = '';
+  if (desc) {
+    descHtml += '<div style="font-size:11px;color:var(--text-low);letter-spacing:1px;margin-bottom:6px">📝 DESCRIPCIÓN</div>';
+    descHtml += desc.replace(/\n/g, '<br>');
+  }
+
+  // Intervalos (lista bonita)
+  let intervals = w.intervals;
+  if (typeof intervals === 'string' && intervals.trim().startsWith('[')) {
+    try { intervals = JSON.parse(intervals); } catch(e) { intervals = []; }
+  }
+  if (Array.isArray(intervals) && intervals.length) {
+    const typeIcon = { warmup:'🟢', main:'🔥', interval:'⚡', rest:'😌', cooldown:'🔵' };
+    const zoneColor = { Z1:'#10b981', Z2:'#3b82f6', Z3:'#f59e0b', Z4:'#ef4444', Z5:'#8b5cf6' };
+    descHtml += '<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)"><div style="font-size:11px;color:var(--text-low);letter-spacing:1px;margin-bottom:8px">🎯 INTERVALOS</div>';
+    intervals.forEach(it => {
+      const icon = typeIcon[it.type] || '•';
+      const zc = zoneColor[it.zone] || 'var(--text-mid)';
+      const rep = (it.repeat && it.repeat > 1) ? ` <span style="color:var(--text-low)">×${it.repeat}</span>` : '';
+      const dur = it.dur_min ? `${it.dur_min} min` : '';
+      const zone = it.zone ? `<span style="color:${zc};font-weight:600">${it.zone}</span>` : '';
+      descHtml += `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04);font-size:13px"><div style="flex:1">${icon} ${it.name || ''}${rep}</div><div style="display:flex;gap:10px;font-family:'Rajdhani',sans-serif;font-weight:600">${dur ? `<span style="color:var(--text-mid)">${dur}</span>` : ''}${zone}</div></div>`;
+    });
+    descHtml += '</div>';
+  }
+
+  descBox.innerHTML = descHtml || '<div style="color:var(--text-low);font-style:italic">Sin descripción</div>';
 
   // Comentario pre del coach
   const preBox = document.getElementById('wkd-comm-pre-box');
