@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Wellness diario</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a1320; --surface:#101f31; --surface2:#16273b; --line:rgba(120,180,210,.14);
+  --ink:#eaf4fb; --dim:#8fb0c4; --faint:#5d7892; --cyan:#27c6e6; --green:#26e29a; --red:#ef5a5a; --amber:#f5a623;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{min-height:100%}
+body{
+  background:radial-gradient(900px 500px at 70% -10%, #11253b 0%, var(--bg) 55%);
+  color:var(--ink);font-family:'Inter',sans-serif;font-size:15px;padding:20px 16px 40px;
+}
+.wrap{max-width:480px;margin:0 auto}
+.head{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+.logo{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;font-size:20px;
+  background:linear-gradient(135deg,var(--cyan),var(--green));color:#05121d}
+.title{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:26px;line-height:1;letter-spacing:.5px}
+.sub{font-size:12px;color:var(--faint);letter-spacing:1px;text-transform:uppercase;margin-top:3px}
+.date{font-family:'Rajdhani',sans-serif;font-weight:600;color:var(--cyan);font-size:14px;margin:14px 0 18px}
+.q{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:15px 15px 13px;margin-bottom:12px}
+.q-t{font-size:15px;font-weight:600;margin-bottom:12px}
+.scale{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.dot{aspect-ratio:1;border-radius:12px;border:1px solid var(--line);background:var(--bg);
+  font-family:'Rajdhani',sans-serif;font-weight:700;font-size:20px;color:var(--dim);
+  display:grid;place-items:center;transition:all .12s;cursor:pointer}
+.dot:active{transform:scale(.93)}
+.dot.on{color:#05121d;border-color:transparent}
+.dot.on.v1{background:#ef5a5a} .dot.on.v2{background:#f5853a}
+.dot.on.v3{background:#f5c542} .dot.on.v4{background:#9fd84a} .dot.on.v5{background:#26e29a}
+.anchors{display:flex;justify-content:space-between;margin-top:8px;font-size:11px;color:var(--faint)}
+.cmt{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:15px;margin-bottom:18px}
+.cmt-t{font-size:15px;font-weight:600;margin-bottom:10px}
+textarea{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px;color:var(--ink);
+  padding:11px;font-family:'Inter',sans-serif;font-size:14px;min-height:64px;resize:vertical}
+textarea:focus{outline:none;border-color:var(--cyan)}
+.send{width:100%;padding:16px;border:none;border-radius:13px;font-family:'Barlow Condensed',sans-serif;
+  font-weight:700;font-size:19px;letter-spacing:1px;color:#05121d;
+  background:linear-gradient(135deg,var(--cyan),var(--green));cursor:pointer;transition:filter .12s}
+.send:active{filter:brightness(.95)}
+.send:disabled{opacity:.5;cursor:default}
+.msg{text-align:center;font-size:13px;margin-top:12px;min-height:18px}
+.msg.err{color:var(--red)} .msg.ok{color:var(--green)}
+/* pantalla de éxito */
+.done{text-align:center;padding:60px 20px}
+.done-em{font-size:64px;margin-bottom:18px}
+.done-t{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:28px;margin-bottom:8px}
+.done-s{color:var(--dim);font-size:15px;line-height:1.5}
+.hidden{display:none}
+.total{text-align:center;font-family:'Rajdhani',sans-serif;font-weight:700;margin:2px 0 14px;color:var(--faint);font-size:13px}
+.total b{color:var(--ink);font-size:16px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div id="form">
+    <div class="head">
+      <div class="logo">🩺</div>
+      <div>
+        <div class="title">Wellness diario</div>
+        <div class="sub" id="who">comoentrenarte</div>
+      </div>
+    </div>
+    <div class="date" id="date">—</div>
+
+    <div id="questions"></div>
+
+    <div class="cmt">
+      <div class="cmt-t">¿Algo que contar? <span style="color:var(--faint);font-weight:400">(opcional)</span></div>
+      <textarea id="cmt" placeholder="Molestias, ánimo, cómo fue el entreno de ayer…"></textarea>
+    </div>
+
+    <div class="total" id="total"></div>
+    <button class="send" id="send" onclick="submit()">Enviar</button>
+    <div class="msg" id="msg"></div>
+  </div>
+
+  <div id="success" class="done hidden">
+    <div class="done-em">✅</div>
+    <div class="done-t">¡Registrado!</div>
+    <div class="done-s" id="done-s">Gracias. Nos vemos en el entreno. 💪</div>
+  </div>
+
+</div>
+
+<script>
+const API='https://script.google.com/macros/s/AKfycbz5e_jS99e3xB-DJMbIEm3L_HXoS2rkED_o3n0_U6S2Ihnc9vJ2E0gUIcYukv4ZyVXI/exec';
+
+// Atleta desde la URL: wellness.html?a=nacho
+const ATHLETE = (new URLSearchParams(location.search).get('a') || '').trim().toLowerCase();
+
+// Las 5 métricas — todas orientadas a "5 = lo mejor"
+const METRICS = [
+  {k:'sueno',   q:'¿Qué tal has dormido?',            lo:'Fatal',         hi:'Genial'},
+  {k:'energia', q:'¿Cómo andas de energía?',          lo:'Sin energía',   hi:'A tope'},
+  {k:'fatiga',  q:'¿Cómo de fresco/descansado?',      lo:'Muy fatigado',  hi:'Muy fresco'},
+  {k:'dolor',   q:'¿Cómo están tus músculos?',        lo:'Muy dolorido',  hi:'Sin dolor'},
+  {k:'animo',   q:'¿Cómo está tu ánimo?',             lo:'Bajo',          hi:'Alto'},
+];
+
+const answers = {};
+
+function pad(n){return String(n).padStart(2,'0')}
+function todayStr(){const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
+
+// Fecha legible
+const meses=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const dias=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+(function(){
+  const d=new Date();
+  document.getElementById('date').textContent =
+    dias[d.getDay()].charAt(0).toUpperCase()+dias[d.getDay()].slice(1)+', '+d.getDate()+' de '+meses[d.getMonth()];
+})();
+
+// Nombre del atleta (best-effort; si falla, usa el id)
+(async function(){
+  if(!ATHLETE){ document.getElementById('who').textContent='Falta el atleta en el enlace'; return; }
+  document.getElementById('who').textContent = ATHLETE;
+  try{
+    const r=await fetch(API+'?type=athletes'); const j=await r.json();
+    const a=((j.data&&j.data.athletes)||[]).find(x=>String(x.id).toLowerCase()===ATHLETE);
+    if(a&&a.nombre) document.getElementById('who').textContent=a.nombre;
+  }catch(e){}
+})();
+
+// Render de las preguntas
+function render(){
+  document.getElementById('questions').innerHTML = METRICS.map((m,mi)=>{
+    const dots=[1,2,3,4,5].map(v=>
+      `<button class="dot" data-k="${m.k}" data-v="${v}" onclick="pick('${m.k}',${v})">${v}</button>`).join('');
+    return `<div class="q">
+      <div class="q-t">${m.q}</div>
+      <div class="scale">${dots}</div>
+      <div class="anchors"><span>${m.lo}</span><span>${m.hi}</span></div>
+    </div>`;
+  }).join('');
+}
+function pick(k,v){
+  answers[k]=v;
+  document.querySelectorAll(`.dot[data-k="${k}"]`).forEach(el=>{
+    const val=+el.dataset.v;
+    el.className='dot'+(val===v?' on v'+v:'');
+  });
+  updateTotal();
+}
+function updateTotal(){
+  const keys=Object.keys(answers);
+  if(keys.length===METRICS.length){
+    const t=METRICS.reduce((s,m)=>s+(answers[m.k]||0),0);
+    document.getElementById('total').innerHTML=`Disponibilidad de hoy: <b>${t}/25</b>`;
+  } else {
+    document.getElementById('total').textContent='';
+  }
+}
+
+async function submit(){
+  const msg=document.getElementById('msg');
+  const faltan=METRICS.filter(m=>!answers[m.k]);
+  if(faltan.length){ msg.className='msg err'; msg.textContent='Responde las '+METRICS.length+' preguntas antes de enviar.'; return; }
+  if(!ATHLETE){ msg.className='msg err'; msg.textContent='El enlace no tiene atleta (?a=…). Pídeselo a tu entrenador.'; return; }
+
+  const total=METRICS.reduce((s,m)=>s+answers[m.k],0);
+  const data={
+    fecha: todayStr(),
+    sueno:answers.sueno, energia:answers.energia, fatiga:answers.fatiga,
+    dolor:answers.dolor, animo:answers.animo,
+    comentario: document.getElementById('cmt').value.trim(),
+    total
+  };
+
+  const btn=document.getElementById('send');
+  btn.disabled=true; msg.className='msg'; msg.textContent='Guardando…';
+  try{
+    await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({type:'wellness', athlete:ATHLETE, data})});
+    // text/plain no deja leer la respuesta por CORS en algunos casos; si no lanza, damos por guardado
+    document.getElementById('form').classList.add('hidden');
+    const s=document.getElementById('success');
+    s.classList.remove('hidden');
+    document.getElementById('done-s').innerHTML =
+      (total<=12 ? 'Día algo cargado, gracias por avisar. Cuídate hoy. 💙' : 'Gracias. ¡A por el entreno! 💪');
+  }catch(e){
+    btn.disabled=false; msg.className='msg err'; msg.textContent='No se pudo enviar. Revisa la conexión e inténtalo de nuevo.';
+  }
+}
+
+render();
+</script>
+</body>
+</html>
