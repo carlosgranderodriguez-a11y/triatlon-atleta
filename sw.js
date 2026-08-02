@@ -1,5 +1,5 @@
 // Service Worker - Mi Triatlón PWA
-const CACHE_VERSION = 'mi-triatlon-v10';
+const CACHE_VERSION = 'mi-triatlon-v11';
 const CACHE_FILES = [
   './',
   './index.html',
@@ -33,14 +33,11 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = event.request.url;
 
-  // Apps Script — siempre intentar red primero
+  // Apps Script — NO interceptar: dejar pasar directo al navegador.
+  // (Interceptar con respondWith(fetch(...)) cuelga en Safari/iPadOS
+  // porque las URLs /exec de Apps Script redirigen (302) a
+  // script.googleusercontent.com y el SW no sigue bien esa redirección.)
   if (url.includes('script.google.com')) {
-    event.respondWith(
-      fetch(event.request).catch(() => new Response(
-        JSON.stringify({ ok: false, error: 'Sin conexión' }),
-        { headers: { 'Content-Type': 'application/json' } }
-      ))
-    );
     return;
   }
 
