@@ -893,6 +893,26 @@ const CONFIG = {
   APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbz5e_jS99e3xB-DJMbIEm3L_HXoS2rkED_o3n0_U6S2Ihnc9vJ2E0gUIcYukv4ZyVXI/exec',
 };
 
+// fetch con timeout: evita que la app se quede "pensando" para siempre.
+// Si no hay respuesta en `ms`, aborta y lanza un error claro y distinguible.
+async function fetchWithTimeout(url, ms = 12000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timer);
+    return res;
+  } catch (e) {
+    clearTimeout(timer);
+    if (e.name === 'AbortError') {
+      const err = new Error('Tiempo de espera agotado (' + (ms / 1000) + 's) sin respuesta del servidor');
+      err.isTimeout = true;
+      throw err;
+    }
+    throw e;
+  }
+}
+
 // Estado global
 const state = {
   athlete: null,    // id del atleta logueado
@@ -926,12 +946,12 @@ async function doLogin() {
     const url = CONFIG.APPS_SCRIPT_URL + '?action=login'
       + '&email=' + encodeURIComponent(email)
       + '&password=' + encodeURIComponent(password);
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url);
     const json = await res.json();
     if (!json.ok) { notify('❌ ' + (json.error || 'Error'), true); return; }
     onLoginSuccess(json.athleteId, json.profile, email);
   } catch(e) {
-    notify('❌ Error de conexión', true);
+    notify('❌ ' + (e.message || 'Error de conexión'), true);
   }
 }
 
@@ -947,13 +967,13 @@ async function doRegister() {
       + '&email=' + encodeURIComponent(email)
       + '&password=' + encodeURIComponent(password)
       + '&athleteId=' + encodeURIComponent(id);
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url);
     const json = await res.json();
     if (!json.ok) { notify('❌ ' + (json.error || 'Error'), true); return; }
     notify('✅ Cuenta creada');
     onLoginSuccess(json.athleteId, json.profile, email);
   } catch(e) {
-    notify('❌ Error de conexión', true);
+    notify('❌ ' + (e.message || 'Error de conexión'), true);
   }
 }
 
@@ -1103,7 +1123,7 @@ async function loadAllData() {
   if (!state.athlete) return;
   try {
     const url = CONFIG.APPS_SCRIPT_URL + '?athlete=' + encodeURIComponent(state.athlete) + '&type=all';
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url);
     const json = await res.json();
     if (json.ok && json.data) {
       state.wellness  = json.data.wellness  || [];
@@ -1117,8 +1137,11 @@ async function loadAllData() {
         if (me) state.profile = me;
       }
       renderAll();
+    } else if (!json.ok) {
+      notify('❌ ' + (json.error || 'Error cargando datos'), true);
     }
   } catch(e) {
+    notify('❌ ' + (e.message || 'Error cargando datos'), true);
     console.warn('Error cargando datos:', e);
   }
 }
