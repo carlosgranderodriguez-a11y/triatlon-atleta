@@ -709,6 +709,17 @@ input[type=range] {
     <div class="card-h"><span class="card-t">⚡ Umbrales actuales</span></div>
     <div id="profile-thresholds"></div>
   </div>
+
+  <div class="card">
+    <div class="card-h"><span class="card-t">📊 Últimos resultados</span></div>
+    <div id="profile-recent-results"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-h"><span class="card-t">🎯 Objetivos calculados (auto)</span></div>
+    <div style="font-size:11px;color:var(--text-low);padding:0 0 10px 0;line-height:1.4">Se recalculan solos a partir de tus entrenos completados. Cuantos más registres, más precisos serán.</div>
+    <div id="profile-auto-targets"></div>
+  </div>
 </div>
 
 
@@ -1848,6 +1859,208 @@ function renderProfilePage() {
   document.getElementById('profile-thresholds').innerHTML = thr.length
     ? thr.map(([l,v]) => `<div class="prof-row"><span class="prof-label">${l}</span><span class="prof-value">${v}</span></div>`).join('')
     : '<div style="color:var(--text-low);font-size:13px;padding:8px">Aún sin umbrales</div>';
+
+  renderRecentResults();
+  renderAutoTargets();
+}
+
+// ════════════════════════════════════════════════════════════
+//  OBJETIVOS AUTOMÁTICOS Y RESUMEN DE RESULTADOS
+//  (se calculan a partir de state.workouts → w.comp, ya cargados)
+// ════════════════════════════════════════════════════════════
+
+// "4:55" → 295 (segundos). Sirve para pace/km, pace/100m, etc.
+function paceStrToSec(paceStr) {
+  if (!paceStr) return 0;
+  const parts = String(paceStr).trim().split(':').map(Number);
+  if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) return parts[0]*60 + parts[1];
+  if (parts.length === 1 && !isNaN(parts[0])) return parts[0];
+  return 0;
+}
+function secToPaceStr(sec) {
+  if (!sec || !isFinite(sec) || sec <= 0) return '—';
+  const m = Math.floor(sec/60), s = Math.round(sec%60);
+  return m + ':' + String(s).padStart(2,'0');
+}
+function secToTimeStr(sec) {
+  if (!sec || !isFinite(sec) || sec <= 0) return '—';
+  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = Math.round(sec%60);
+  return (h > 0 ? h + ':' + String(m).padStart(2,'0') : m) + ':' + String(s).padStart(2,'0');
+}
+
+// Predice el tiempo a una distancia objetivo a partir de resultados reales,
+// usando la fórmula de Riegel (T2 = T1 · (D2/D1)^1.06), y se queda con la mejor.
+function computeRunTargets(workouts) {
+  const results = [];
+  workouts.forEach(w => {
+    if (w.disc !== 'run' || !w.comp || !w.comp.dist || !w.comp.dur) return;
+    const distKm = parseFloat(w.comp.dist);
+    const timeMin = parseTimeToMin(w.comp.dur);
+    if (!distKm || distKm < 1 || !timeMin) return;
+    results.push({ distKm, timeSec: timeMin * 60, fecha: w.fecha });
+  });
+  if (!results.length) return null;
+
+  function predict(targetKm) {
+    let best = Infinity;
+    results.forEach(r => {
+      const t = r.timeSec * Math.pow(targetKm / r.distKm, 1.06);
+      if (t < best) best = t;
+    });
+    return best;
+  }
+  const t5k = predict(5), t10k = predict(10);
+  return { t5k, pace5k: t5k/5, t10k, pace10k: t10k/10, basedOn: results.length };
+}
+
+// Mejor potencia media sostenida en sesiones cuya duración cae dentro de cada bucket.
+function computeBikeTargets(workouts) {
+  const bikes = [];
+  workouts.forEach(w => {
+    if ((w.disc !== 'bike' && w.disc !== 'brick') || !w.comp || !w.comp.pw_avg || !w.comp.dur) return;
+    const durMin = parseTimeToMin(w.comp.dur);
+    const pw = parseFloat(w.comp.pw_avg);
+    if (!durMin || !pw) return;
+    bikes.push({ durMin, pw, fecha: w.fecha });
+  });
+  if (!bikes.length) return null;
+
+  const buckets = [
+    { label: '10 min', min: 8,  max: 16 },
+    { label: '20 min', min: 16, max: 32 },
+    { label: '40 min', min: 32, max: 75 },
+  ];
+  const out = buckets.map(b => {
+    let best = 0;
+    bikes.forEach(x => { if (x.durMin >= b.min && x.durMin <= b.max && x.pw > best) best = x.pw; });
+    return { label: b.label, watts: best || null };
+  });
+  return { buckets: out, basedOn: bikes.length };
+}
+
+// Mejor ritmo/100m sostenido en tiradas largas → proyectado a 500m y 1000m.
+function computeSwimTargets(workouts) {
+  const swims = [];
+  workouts.forEach(w => {
+    if (w.disc !== 'swim' || !w.comp || !w.comp.pace || !w.comp.dist) return;
+    const dist = parseFloat(w.comp.dist);
+    const paceSec = paceStrToSec(w.comp.pace);
+    if (!dist || !paceSec) return;
+    swims.push({ dist, paceSec, fecha: w.fecha });
+  });
+  if (!swims.length) return null;
+
+  function bestPaceFor(minDist) {
+    let best = Infinity;
+    swims.forEach(s => { if (s.dist >= minDist && s.paceSec < best) best = s.paceSec; });
+    return best === Infinity ? null : best;
+  }
+  const pace500  = bestPaceFor(400) ?? bestPaceFor(200);
+  const pace1000 = bestPaceFor(800) ?? pace500;
+  return {
+    pace500,  time500:  pace500  ? pace500*5   : null,
+    pace1000, time1000: pace1000 ? pace1000*10 : null,
+    basedOn: swims.length,
+  };
+}
+
+// Compara la media de las últimas sesiones vs las anteriores para ver la tendencia.
+// metric: 'pace' (menos es mejor) o 'power' (más es mejor).
+function computeTrend(workouts, disc, metric) {
+  let list = workouts.filter(w => {
+    if (disc === 'brick_bike') return w.disc === 'bike' || w.disc === 'brick';
+    return w.disc === disc;
+  }).filter(w => w.comp && w.fecha && (metric === 'power' ? w.comp.pw_avg : w.comp.pace));
+  list = list.sort((a,b) => a.fecha.localeCompare(b.fecha));
+  if (list.length < 4) return null;
+
+  const vals = list.map(w => metric === 'power' ? parseFloat(w.comp.pw_avg) : paceStrToSec(w.comp.pace));
+  const half = Math.max(2, Math.floor(vals.length/2));
+  const recent = vals.slice(-half), prior = vals.slice(0, vals.length - half);
+  if (!prior.length) return null;
+  const avg = arr => arr.reduce((a,b) => a+b, 0) / arr.length;
+  const diffPct = (avg(recent) - avg(prior)) / avg(prior) * 100;
+  const improving = metric === 'power' ? diffPct > 1.5  : diffPct < -1.5;
+  const worsening = metric === 'power' ? diffPct < -1.5 : diffPct > 1.5;
+  return { improving, worsening, diffPct };
+}
+
+function trendBadge(t) {
+  if (!t) return '';
+  if (t.improving) return ' <span style="color:var(--accent3);font-size:11px">↑ mejorando</span>';
+  if (t.worsening) return ' <span style="color:var(--run);font-size:11px">↓ bajando</span>';
+  return ' <span style="color:var(--text-low);font-size:11px">→ estable</span>';
+}
+
+function renderRecentResults() {
+  const box = document.getElementById('profile-recent-results');
+  if (!box) return;
+  const discE = { swim:'🏊', bike:'🚴', run:'🏃', brick:'🔥', gym:'🏋' };
+  const recent = (state.workouts || [])
+    .filter(w => w.comp && (w.comp.dur || w.comp.dist) && w.fecha)
+    .sort((a,b) => b.fecha.localeCompare(a.fecha))
+    .slice(0, 6);
+
+  if (!recent.length) {
+    box.innerHTML = '<div style="color:var(--text-low);font-size:13px;padding:8px">Aún sin resultados registrados</div>';
+    return;
+  }
+  box.innerHTML = recent.map(w => {
+    const icon = discE[w.disc] || '⚡';
+    const dist = w.comp.dist ? (w.disc === 'swim' ? w.comp.dist + 'm' : w.comp.dist + 'km') : '';
+    const pace = w.comp.pace ? ' · ' + w.comp.pace + (w.disc === 'swim' ? '/100m' : '/km') : '';
+    const val  = [w.comp.dur, dist].filter(Boolean).join(' · ') + pace;
+    return `<div class="prof-row"><span class="prof-label">${icon} ${w.fecha}</span><span class="prof-value">${val || '—'}</span></div>`;
+  }).join('');
+}
+
+function renderAutoTargets() {
+  const box = document.getElementById('profile-auto-targets');
+  if (!box) return;
+  const workouts = state.workouts || [];
+  const runT  = computeRunTargets(workouts);
+  const bikeT = computeBikeTargets(workouts);
+  const swimT = computeSwimTargets(workouts);
+
+  const trendRun  = computeTrend(workouts, 'run', 'pace');
+  const trendBike = computeTrend(workouts, 'brick_bike', 'power');
+  const trendSwim = computeTrend(workouts, 'swim', 'pace');
+
+  let html = '';
+
+  html += '<div style="margin-bottom:14px">';
+  html += `<div style="font-size:12px;color:var(--text-mid);font-weight:600;margin-bottom:4px">🏃 Carrera${trendBadge(trendRun)}</div>`;
+  if (runT) {
+    html += `<div class="prof-row"><span class="prof-label">Objetivo 5K</span><span class="prof-value">${secToPaceStr(runT.pace5k)}/km · ${secToTimeStr(runT.t5k)}</span></div>`;
+    html += `<div class="prof-row"><span class="prof-label">Objetivo 10K</span><span class="prof-value">${secToPaceStr(runT.pace10k)}/km · ${secToTimeStr(runT.t10k)}</span></div>`;
+  } else {
+    html += '<div style="color:var(--text-low);font-size:12px;padding:4px 0">Faltan entrenos de carrera con distancia y tiempo registrados</div>';
+  }
+  html += '</div>';
+
+  html += '<div style="margin-bottom:14px">';
+  html += `<div style="font-size:12px;color:var(--text-mid);font-weight:600;margin-bottom:4px">🚴 Bici${trendBadge(trendBike)}</div>`;
+  if (bikeT) {
+    bikeT.buckets.forEach(b => {
+      html += `<div class="prof-row"><span class="prof-label">Vatios objetivo (~${b.label})</span><span class="prof-value">${b.watts ? b.watts + ' W' : '—'}</span></div>`;
+    });
+    html += '<div style="color:var(--text-low);font-size:10px;padding:4px 0 0 0">Estimado con la potencia media registrada por sesión</div>';
+  } else {
+    html += '<div style="color:var(--text-low);font-size:12px;padding:4px 0">Faltan entrenos de bici con potencia media registrada</div>';
+  }
+  html += '</div>';
+
+  html += '<div>';
+  html += `<div style="font-size:12px;color:var(--text-mid);font-weight:600;margin-bottom:4px">🏊 Natación${trendBadge(trendSwim)}</div>`;
+  if (swimT) {
+    html += `<div class="prof-row"><span class="prof-label">Ritmo 500m</span><span class="prof-value">${swimT.pace500 ? secToPaceStr(swimT.pace500) + '/100m · ' + secToTimeStr(swimT.time500) : '—'}</span></div>`;
+    html += `<div class="prof-row"><span class="prof-label">Ritmo 1000m</span><span class="prof-value">${swimT.pace1000 ? secToPaceStr(swimT.pace1000) + '/100m · ' + secToTimeStr(swimT.time1000) : '—'}</span></div>`;
+  } else {
+    html += '<div style="color:var(--text-low);font-size:12px;padding:4px 0">Faltan entrenos de natación con distancia y ritmo registrados</div>';
+  }
+  html += '</div>';
+
+  box.innerHTML = html;
 }
 
 // ════════════════════════════════════════════════════════════
