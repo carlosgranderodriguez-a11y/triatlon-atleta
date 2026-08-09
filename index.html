@@ -440,6 +440,22 @@ input[type=range] {
 .bb-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-mid); margin-bottom: 4px; }
 .bb-track { background: rgba(255,255,255,.06); border-radius: 8px; height: 12px; position: relative; overflow: hidden; }
 .bb-fill { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 8px; background: linear-gradient(90deg, var(--run), var(--accent3)); }
+
+/* ── RESUMEN DE ENTRENOS (totales + mejores marcas) ── */
+.rs-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+.rs-tile {
+  background: rgba(255,255,255,.03); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px 4px; text-align: center;
+}
+.rs-tile .rs-v { font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 17px; color: var(--text-hi); }
+.rs-tile .rs-l { font-size: 9px; color: var(--text-low); text-transform: uppercase; letter-spacing: .5px; margin-top: 4px; }
+.rs-best {
+  background: rgba(255,255,255,.03); border: 1px solid var(--border);
+  border-radius: 12px; padding: 12px; text-align: center; margin-top: 4px;
+}
+.rs-best .rs-best-v { font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 22px; }
+.rs-best .rs-best-l { font-size: 10px; color: var(--text-low); text-transform: uppercase; letter-spacing: .5px; margin-top: 4px; }
+.rs-best .rs-best-d { font-size: 11px; color: var(--text-mid); margin-top: 2px; }
 .sleep-block { margin-top: 14px; }
 .sleep-times { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-mid); margin-bottom: 6px; }
 .sleep-stages-bar { display: flex; height: 14px; border-radius: 8px; overflow: hidden; background: rgba(255,255,255,.05); }
@@ -782,6 +798,21 @@ input[type=range] {
 
 
 <!-- ════════ PAGE: PERFIL ════════ -->
+<div id="page-resumen" class="page">
+  <div class="card">
+    <div class="card-h"><span class="card-t">🏃 Carrera</span></div>
+    <div id="resumen-run"></div>
+  </div>
+  <div class="card">
+    <div class="card-h"><span class="card-t">🏊 Natación</span></div>
+    <div id="resumen-swim"></div>
+  </div>
+  <div class="card">
+    <div class="card-h"><span class="card-t">🚴 Bici</span></div>
+    <div id="resumen-bike"></div>
+  </div>
+</div>
+
 <div id="page-profile" class="page">
   <div class="card">
     <div class="card-h"><span class="card-t">👤 Mi perfil</span></div>
@@ -952,6 +983,10 @@ input[type=range] {
   <button class="nav-item" onclick="showPage('plan',this)">
     <span class="nav-icon">📅</span>
     <span class="nav-label">Plan</span>
+  </button>
+  <button class="nav-item" onclick="showPage('resumen',this)">
+    <span class="nav-icon">📈</span>
+    <span class="nav-label">Resumen</span>
   </button>
   <button class="nav-item" onclick="showPage('profile',this)">
     <span class="nav-icon">👤</span>
@@ -1241,6 +1276,140 @@ function renderAll() {
   renderSessionPage();
   renderPlanPage();
   renderProfilePage();
+  renderResumenPage();
+}
+
+// ════════════════════════════════════════════════════════════
+//  RESUMEN DE ENTRENOS — totales por semana/mes/año y mejores marcas
+//  (combina entrenos planificados en la app + actividades de Garmin)
+// ════════════════════════════════════════════════════════════
+function garminDiscFromType(tipo) {
+  const run  = ['running','treadmill_running','trail_running'];
+  const bike = ['cycling','road_biking','mountain_biking','indoor_cycling'];
+  const swim = ['lap_swimming','open_water_swimming'];
+  if (run.includes(tipo))  return 'run';
+  if (bike.includes(tipo)) return 'bike';
+  if (swim.includes(tipo)) return 'swim';
+  return 'other';
+}
+
+function unifiedSessions() {
+  const out = [];
+  (state.workouts || []).forEach(w => {
+    if (!w.comp || !w.fecha) return;
+    if (!w.comp.dist && !w.comp.dur) return;
+    const distKm = w.comp.dist ? (w.disc === 'swim' ? parseFloat(w.comp.dist) / 1000 : parseFloat(w.comp.dist)) : null;
+    const durSec = w.comp.dur ? parseTimeToMin(w.comp.dur) * 60 : null;
+    out.push({ fecha: w.fecha, disc: w.disc, distKm, durSec });
+  });
+  (state.garmin || []).forEach(g => {
+    let acts = [];
+    try { acts = JSON.parse(g.actividades_json || '[]'); } catch(e) {}
+    acts.forEach(a => {
+      out.push({
+        fecha: g.fecha,
+        disc: garminDiscFromType(a.tipo),
+        distKm: a.dist_m ? a.dist_m / 1000 : null,
+        durSec: a.dur_seg || null,
+      });
+    });
+  });
+  return out;
+}
+
+function getRangeCutoffs() {
+  const now = new Date();
+  const dow = now.getDay() || 7; // 1=lunes...7=domingo
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - (dow - 1));
+  const pad = n => String(n).padStart(2, '0');
+  const iso = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  return {
+    week:  iso(monday),
+    month: `${now.getFullYear()}-${pad(now.getMonth()+1)}-01`,
+    year:  `${now.getFullYear()}-01-01`,
+  };
+}
+
+function sumDistKm(sessions, disc, sinceStr) {
+  return sessions
+    .filter(s => s.disc === disc && s.distKm && s.fecha >= sinceStr)
+    .reduce((sum, s) => sum + s.distKm, 0);
+}
+
+function bestRunPace(sessions) {
+  let best = null;
+  sessions.filter(s => s.disc === 'run' && s.distKm >= 1 && s.durSec).forEach(s => {
+    const paceSecPerKm = s.durSec / s.distKm;
+    if (!best || paceSecPerKm < best.paceSecPerKm) best = { paceSecPerKm, fecha: s.fecha };
+  });
+  return best;
+}
+
+function bestSwim500(sessions) {
+  let best = null;
+  sessions.filter(s => s.disc === 'swim' && s.distKm && s.distKm * 1000 >= 400 && s.durSec).forEach(s => {
+    const paceSecPer100 = s.durSec / (s.distKm * 1000 / 100);
+    if (!best || paceSecPer100 < best.paceSecPer100) best = { paceSecPer100, fecha: s.fecha };
+  });
+  return best;
+}
+
+function renderResumenPage() {
+  const runBox  = document.getElementById('resumen-run');
+  const swimBox = document.getElementById('resumen-swim');
+  const bikeBox = document.getElementById('resumen-bike');
+  if (!runBox || !swimBox || !bikeBox) return;
+
+  const sessions = unifiedSessions();
+  const cut = getRangeCutoffs();
+
+  // ── Carrera ──
+  const runWeek  = sumDistKm(sessions, 'run', cut.week);
+  const runMonth = sumDistKm(sessions, 'run', cut.month);
+  const runYear  = sumDistKm(sessions, 'run', cut.year);
+  const runBest  = bestRunPace(sessions);
+  let runHtml = '<div class="rs-tiles">';
+  runHtml += `<div class="rs-tile"><div class="rs-v">${runWeek.toFixed(1)}</div><div class="rs-l">km semana</div></div>`;
+  runHtml += `<div class="rs-tile"><div class="rs-v">${runMonth.toFixed(1)}</div><div class="rs-l">km mes</div></div>`;
+  runHtml += `<div class="rs-tile"><div class="rs-v">${runYear.toFixed(1)}</div><div class="rs-l">km año</div></div>`;
+  runHtml += '</div>';
+  if (runBest) {
+    const fechaCorta = runBest.fecha.slice(5).split('-').reverse().join('/');
+    runHtml += `<div class="rs-best"><div class="rs-best-v" style="color:var(--run)">${secToPaceStr(runBest.paceSecPerKm)}/km</div><div class="rs-best-l">Mejor km corrido</div><div class="rs-best-d">${fechaCorta}</div></div>`;
+  } else {
+    runHtml += '<div class="goal-empty">Aún sin carreras de 1km o más registradas</div>';
+  }
+  runBox.innerHTML = runHtml;
+
+  // ── Natación ──
+  const swimWeekM  = sumDistKm(sessions, 'swim', cut.week)  * 1000;
+  const swimMonthM = sumDistKm(sessions, 'swim', cut.month) * 1000;
+  const swimYearM  = sumDistKm(sessions, 'swim', cut.year)  * 1000;
+  const swimBest   = bestSwim500(sessions);
+  let swimHtml = '<div class="rs-tiles">';
+  swimHtml += `<div class="rs-tile"><div class="rs-v">${Math.round(swimWeekM)}</div><div class="rs-l">m semana</div></div>`;
+  swimHtml += `<div class="rs-tile"><div class="rs-v">${Math.round(swimMonthM)}</div><div class="rs-l">m mes</div></div>`;
+  swimHtml += `<div class="rs-tile"><div class="rs-v">${Math.round(swimYearM)}</div><div class="rs-l">m año</div></div>`;
+  swimHtml += '</div>';
+  if (swimBest) {
+    const fechaCorta = swimBest.fecha.slice(5).split('-').reverse().join('/');
+    const t500 = swimBest.paceSecPer100 * 5;
+    swimHtml += `<div class="rs-best"><div class="rs-best-v" style="color:var(--swim)">${secToTimeStr(t500)}</div><div class="rs-best-l">Mejores 500m (${secToPaceStr(swimBest.paceSecPer100)}/100m)</div><div class="rs-best-d">${fechaCorta}</div></div>`;
+  } else {
+    swimHtml += '<div class="goal-empty">Aún sin tiradas de 400m o más registradas</div>';
+  }
+  swimBox.innerHTML = swimHtml;
+
+  // ── Bici ──
+  const bikeWeek  = sumDistKm(sessions, 'bike', cut.week);
+  const bikeMonth = sumDistKm(sessions, 'bike', cut.month);
+  const bikeYear  = sumDistKm(sessions, 'bike', cut.year);
+  bikeBox.innerHTML = `<div class="rs-tiles">
+    <div class="rs-tile"><div class="rs-v">${bikeWeek.toFixed(1)}</div><div class="rs-l">km semana</div></div>
+    <div class="rs-tile"><div class="rs-v">${bikeMonth.toFixed(1)}</div><div class="rs-l">km mes</div></div>
+    <div class="rs-tile"><div class="rs-v">${bikeYear.toFixed(1)}</div><div class="rs-l">km año</div></div>
+  </div>`;
 }
 
 // ════════════════════════════════════════════════════════════
