@@ -501,6 +501,17 @@ input[type=range] {
     <div class="card-h"><span class="card-t">💬 Mensajes del coach</span></div>
     <div id="recent-coach-msgs"></div>
   </div>
+
+  <div class="card">
+    <div class="card-h"><span class="card-t">📊 Últimos resultados</span></div>
+    <div id="profile-recent-results"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-h"><span class="card-t">🎯 Objetivos calculados (auto)</span></div>
+    <div style="font-size:11px;color:var(--text-low);padding:0 0 10px 0;line-height:1.4">Se recalculan solos a partir de tus entrenos completados. Cuantos más registres, más precisos serán.</div>
+    <div id="profile-auto-targets"></div>
+  </div>
 </div>
 
 
@@ -708,17 +719,6 @@ input[type=range] {
   <div class="card">
     <div class="card-h"><span class="card-t">⚡ Umbrales actuales</span></div>
     <div id="profile-thresholds"></div>
-  </div>
-
-  <div class="card">
-    <div class="card-h"><span class="card-t">📊 Últimos resultados</span></div>
-    <div id="profile-recent-results"></div>
-  </div>
-
-  <div class="card">
-    <div class="card-h"><span class="card-t">🎯 Objetivos calculados (auto)</span></div>
-    <div style="font-size:11px;color:var(--text-low);padding:0 0 10px 0;line-height:1.4">Se recalculan solos a partir de tus entrenos completados. Cuantos más registres, más precisos serán.</div>
-    <div id="profile-auto-targets"></div>
   </div>
 </div>
 
@@ -1389,6 +1389,9 @@ function renderTodayPage() {
   } else {
     document.getElementById('recent-coach-card').style.display = 'none';
   }
+
+  renderRecentResults();
+  renderAutoTargets();
 }
 
 function renderWeekMini() {
@@ -1859,9 +1862,6 @@ function renderProfilePage() {
   document.getElementById('profile-thresholds').innerHTML = thr.length
     ? thr.map(([l,v]) => `<div class="prof-row"><span class="prof-label">${l}</span><span class="prof-value">${v}</span></div>`).join('')
     : '<div style="color:var(--text-low);font-size:13px;padding:8px">Aún sin umbrales</div>';
-
-  renderRecentResults();
-  renderAutoTargets();
 }
 
 // ════════════════════════════════════════════════════════════
