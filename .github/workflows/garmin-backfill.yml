@@ -1,0 +1,32 @@
+name: Backfill histórico de Garmin
+
+on:
+  workflow_dispatch:
+    inputs:
+      months:
+        description: 'Cuántos meses hacia atrás traer'
+        required: false
+        default: '6'
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el repo
+        uses: actions/checkout@v4
+
+      - name: Preparar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: pip install -r scripts/requirements.txt
+
+      - name: Ejecutar backfill
+        run: python scripts/garmin_backfill.py
+        env:
+          GARMIN_EMAIL: ${{ secrets.GARMIN_EMAIL }}
+          GARMIN_PASSWORD: ${{ secrets.GARMIN_PASSWORD }}
+          GARMIN_ATHLETE: ${{ secrets.GARMIN_ATHLETE }}
+          BACKFILL_MONTHS: ${{ github.event.inputs.months }}

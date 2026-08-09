@@ -582,32 +582,58 @@ function saveGarmin(athlete, data) {
   const sheet   = getOrCreateSheet(SHEET_NAMES.garmin, GARMIN_HEADERS);
   const headers = getHeaders(sheet);
   const fechaStr = String(data.fecha || '').slice(0, 10);
+  const id = 'garmin_' + athlete + '_' + fechaStr;
 
-  const vals = Object.assign({}, data, {
-    athlete: athlete,
-    fecha: fechaStr,
-    id: 'garmin_' + athlete + '_' + fechaStr,
-    actividades_json: JSON.stringify(data.actividades || []),
-    full_json: JSON.stringify(data),
-  });
-
+  // Buscamos si ya hay fila para ese día, y recogemos lo que ya tenía
+  // guardado (para no perder sueño/HRV si ahora solo llegan actividades, o
+  // viceversa).
   const idCol = headers.indexOf('id');
   const all = sheet.getDataRange().getValues();
   let targetRow = -1;
+  let existingObj = {};
   if (idCol >= 0) {
     for (let i = 1; i < all.length; i++) {
-      if (String(all[i][idCol]) === String(vals.id)) { targetRow = i + 1; break; }
+      if (String(all[i][idCol]) === String(id)) {
+        targetRow = i + 1;
+        headers.forEach((h, idx) => { if (h) existingObj[h] = all[i][idx]; });
+        break;
+      }
     }
   }
+
+  // Actividades: combinamos las nuevas con las que ya hubiera, sin duplicar.
+  let mergedActs = [];
+  try { mergedActs = JSON.parse(existingObj.actividades_json || '[]'); } catch(e) {}
+  if (data.actividades) {
+    const seen = new Set(mergedActs.map(a => JSON.stringify(a)));
+    data.actividades.forEach(a => {
+      const key = JSON.stringify(a);
+      if (!seen.has(key)) { mergedActs.push(a); seen.add(key); }
+    });
+  }
+
+  const vals = Object.assign({}, existingObj, data, {
+    athlete: athlete,
+    fecha: fechaStr,
+    id: id,
+    actividades_json: JSON.stringify(mergedActs),
+    full_json: JSON.stringify(Object.assign({}, existingObj, data, { actividades: mergedActs })),
+  });
 
   const row = headers.map(h => (vals[h] !== undefined ? vals[h] : ''));
   const target = targetRow > 0 ? targetRow : sheet.getLastRow() + 1;
   sheet.getRange(target, 1, 1, row.length).setValues([row]);
 
-  const fechaColIdx = headers.indexOf('fecha') + 1;
-  if (fechaColIdx > 0) sheet.getRange(target, fechaColIdx).setNumberFormat('@').setValue(fechaStr);
+  // Fijar como texto la fecha y las horas de sueño (evita que Sheets las
+  // reinterprete como Date y las desfase, el mismo bug de antes).
+  ['fecha', 'sleep_start', 'sleep_end'].forEach(name => {
+    const col = headers.indexOf(name) + 1;
+    if (col > 0 && vals[name] !== '' && vals[name] != null) {
+      sheet.getRange(target, col).setNumberFormat('@').setValue(String(vals[name]));
+    }
+  });
 
-  return { saved: true, id: vals.id, updated: targetRow > 0 };
+  return { saved: true, id: id, updated: targetRow > 0 };
 }
 
 function getGarmin(athlete) {
