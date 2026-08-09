@@ -377,6 +377,56 @@ input[type=range] {
 .prof-label { color: var(--text-low); }
 .prof-value { color: var(--text-hi); font-weight: 500; }
 
+/* ── RESULTADOS RECIENTES (tira horizontal) ── */
+.res-strip { display: flex; gap: 10px; overflow-x: auto; padding: 2px 2px 6px 2px; -webkit-overflow-scrolling: touch; }
+.res-strip::-webkit-scrollbar { height: 4px; }
+.res-strip::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 4px; }
+.res-card {
+  flex: 0 0 auto; min-width: 108px;
+  background: rgba(255,255,255,.03); border: 1px solid var(--border);
+  border-left: 3px solid var(--accent); border-radius: 10px; padding: 10px 12px;
+}
+.res-icon { font-size: 20px; line-height: 1; }
+.res-date { font-size: 10px; color: var(--text-low); letter-spacing: .5px; margin-top: 6px; text-transform: uppercase; }
+.res-val { font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 15px; margin-top: 2px; color: var(--text-hi); }
+.res-sub { font-size: 11px; color: var(--text-mid); margin-top: 1px; }
+
+/* ── OBJETIVOS: bloque por disciplina ── */
+.goal-block { margin-bottom: 18px; }
+.goal-block:last-child { margin-bottom: 0; }
+.goal-head {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--text-mid); font-weight: 600; margin-bottom: 10px;
+}
+.goal-head .goal-icon { font-size: 16px; }
+.goal-trend { font-size: 11px; padding: 2px 8px; border-radius: 20px; margin-left: auto; }
+.goal-trend.up   { color: var(--accent3); background: rgba(0,255,157,.1); }
+.goal-trend.down { color: var(--run);     background: rgba(239,68,68,.1); }
+.goal-trend.flat { color: var(--text-low); background: rgba(255,255,255,.05); }
+
+.goal-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.goal-tile {
+  background: rgba(255,255,255,.03); border: 1px solid var(--border);
+  border-radius: 12px; padding: 14px 10px; text-align: center;
+}
+.goal-tile .goal-v { font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 21px; line-height: 1; }
+.goal-tile .goal-sub { font-size: 11px; color: var(--text-mid); margin-top: 5px; }
+.goal-tile .goal-l { font-size: 9px; color: var(--text-low); letter-spacing: 1px; text-transform: uppercase; margin-top: 6px; }
+.goal-empty { color: var(--text-low); font-size: 12px; padding: 6px 0; }
+
+/* ── CURVA DE POTENCIA (barras) ── */
+.power-chart { display: flex; align-items: flex-end; gap: 16px; height: 110px; padding: 6px 6px 0 6px; }
+.power-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+.power-bar {
+  width: 100%; max-width: 46px; border-radius: 8px 8px 3px 3px;
+  background: linear-gradient(180deg, var(--bike), rgba(245,158,11,.35));
+  display: flex; align-items: flex-start; justify-content: center; padding-top: 4px;
+  box-shadow: 0 0 14px rgba(245,158,11,.25);
+}
+.power-bar-val { font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 13px; color: #0a0a0a; }
+.power-bar-label { font-size: 10px; color: var(--text-low); margin-top: 8px; text-align: center; }
+.power-bar-empty { width: 100%; max-width: 46px; border-radius: 8px 8px 3px 3px; border: 1px dashed var(--border-mid); height: 14%; }
+
 /* ── HISTORY ── */
 .hist-day {
   margin-bottom: 14px;
@@ -1987,31 +2037,38 @@ function computeTrend(workouts, disc, metric) {
 
 function trendBadge(t) {
   if (!t) return '';
-  if (t.improving) return ' <span style="color:var(--accent3);font-size:11px">↑ mejorando</span>';
-  if (t.worsening) return ' <span style="color:var(--run);font-size:11px">↓ bajando</span>';
-  return ' <span style="color:var(--text-low);font-size:11px">→ estable</span>';
+  if (t.improving) return '<span class="goal-trend up">↑ mejorando</span>';
+  if (t.worsening) return '<span class="goal-trend down">↓ bajando</span>';
+  return '<span class="goal-trend flat">→ estable</span>';
 }
 
 function renderRecentResults() {
   const box = document.getElementById('profile-recent-results');
   if (!box) return;
   const discE = { swim:'🏊', bike:'🚴', run:'🏃', brick:'🔥', gym:'🏋' };
+  const discColor = { swim:'var(--swim)', bike:'var(--bike)', run:'var(--run)', brick:'var(--accent)', gym:'var(--text-mid)' };
   const recent = (state.workouts || [])
     .filter(w => w.comp && (w.comp.dur || w.comp.dist) && w.fecha)
     .sort((a,b) => b.fecha.localeCompare(a.fecha))
-    .slice(0, 6);
+    .slice(0, 8);
 
   if (!recent.length) {
-    box.innerHTML = '<div style="color:var(--text-low);font-size:13px;padding:8px">Aún sin resultados registrados</div>';
+    box.innerHTML = '<div class="goal-empty">Aún sin resultados registrados</div>';
     return;
   }
-  box.innerHTML = recent.map(w => {
+  box.innerHTML = '<div class="res-strip">' + recent.map(w => {
     const icon = discE[w.disc] || '⚡';
+    const color = discColor[w.disc] || 'var(--accent)';
     const dist = w.comp.dist ? (w.disc === 'swim' ? w.comp.dist + 'm' : w.comp.dist + 'km') : '';
-    const pace = w.comp.pace ? ' · ' + w.comp.pace + (w.disc === 'swim' ? '/100m' : '/km') : '';
-    const val  = [w.comp.dur, dist].filter(Boolean).join(' · ') + pace;
-    return `<div class="prof-row"><span class="prof-label">${icon} ${w.fecha}</span><span class="prof-value">${val || '—'}</span></div>`;
-  }).join('');
+    const pace = w.comp.pace ? w.comp.pace + (w.disc === 'swim' ? '/100m' : '/km') : '';
+    const fechaCorta = w.fecha ? w.fecha.slice(5).split('-').reverse().join('/') : '';
+    return `<div class="res-card" style="border-left-color:${color}">
+      <div class="res-icon">${icon}</div>
+      <div class="res-date">${fechaCorta}</div>
+      <div class="res-val">${w.comp.dur || dist || '—'}</div>
+      <div class="res-sub">${[dist && w.comp.dur ? dist : '', pace].filter(Boolean).join(' · ')}</div>
+    </div>`;
+  }).join('') + '</div>';
 }
 
 function renderAutoTargets() {
@@ -2028,35 +2085,68 @@ function renderAutoTargets() {
 
   let html = '';
 
-  html += '<div style="margin-bottom:14px">';
-  html += `<div style="font-size:12px;color:var(--text-mid);font-weight:600;margin-bottom:4px">🏃 Carrera${trendBadge(trendRun)}</div>`;
+  // ── CARRERA ──
+  html += '<div class="goal-block">';
+  html += `<div class="goal-head"><span class="goal-icon">🏃</span> Carrera ${trendBadge(trendRun)}</div>`;
   if (runT) {
-    html += `<div class="prof-row"><span class="prof-label">Objetivo 5K</span><span class="prof-value">${secToPaceStr(runT.pace5k)}/km · ${secToTimeStr(runT.t5k)}</span></div>`;
-    html += `<div class="prof-row"><span class="prof-label">Objetivo 10K</span><span class="prof-value">${secToPaceStr(runT.pace10k)}/km · ${secToTimeStr(runT.t10k)}</span></div>`;
+    html += `<div class="goal-tiles">
+      <div class="goal-tile" style="border-color:rgba(239,68,68,.25)">
+        <div class="goal-v" style="color:var(--run)">${secToPaceStr(runT.pace5k)}<span style="font-size:12px;color:var(--text-low)">/km</span></div>
+        <div class="goal-sub">${secToTimeStr(runT.t5k)}</div>
+        <div class="goal-l">Objetivo 5K</div>
+      </div>
+      <div class="goal-tile" style="border-color:rgba(239,68,68,.25)">
+        <div class="goal-v" style="color:var(--run)">${secToPaceStr(runT.pace10k)}<span style="font-size:12px;color:var(--text-low)">/km</span></div>
+        <div class="goal-sub">${secToTimeStr(runT.t10k)}</div>
+        <div class="goal-l">Objetivo 10K</div>
+      </div>
+    </div>`;
   } else {
-    html += '<div style="color:var(--text-low);font-size:12px;padding:4px 0">Faltan entrenos de carrera con distancia y tiempo registrados</div>';
+    html += '<div class="goal-empty">Faltan entrenos de carrera con distancia y tiempo registrados</div>';
   }
   html += '</div>';
 
-  html += '<div style="margin-bottom:14px">';
-  html += `<div style="font-size:12px;color:var(--text-mid);font-weight:600;margin-bottom:4px">🚴 Bici${trendBadge(trendBike)}</div>`;
+  // ── BICI (curva de potencia en barras) ──
+  html += '<div class="goal-block">';
+  html += `<div class="goal-head"><span class="goal-icon">🚴</span> Bici ${trendBadge(trendBike)}</div>`;
   if (bikeT) {
-    bikeT.buckets.forEach(b => {
-      html += `<div class="prof-row"><span class="prof-label">Vatios objetivo (~${b.label})</span><span class="prof-value">${b.watts ? b.watts + ' W' : '—'}</span></div>`;
-    });
-    html += '<div style="color:var(--text-low);font-size:10px;padding:4px 0 0 0">Estimado con la potencia media registrada por sesión</div>';
+    const maxW = Math.max(...bikeT.buckets.map(b => b.watts || 0), 1);
+    html += '<div class="power-chart">' + bikeT.buckets.map(b => {
+      if (!b.watts) {
+        return `<div class="power-bar-wrap"><div class="power-bar-empty"></div><div class="power-bar-label">—<br>~${b.label}</div></div>`;
+      }
+      const hpct = Math.max(18, Math.round((b.watts / maxW) * 100));
+      return `<div class="power-bar-wrap">
+        <div class="power-bar" style="height:${hpct}%">
+          <span class="power-bar-val">${b.watts}</span>
+        </div>
+        <div class="power-bar-label">~${b.label}</div>
+      </div>`;
+    }).join('') + '</div>';
+    html += '<div style="color:var(--text-low);font-size:10px;padding:8px 2px 0 2px">W estimados a partir de la potencia media registrada por sesión</div>';
   } else {
-    html += '<div style="color:var(--text-low);font-size:12px;padding:4px 0">Faltan entrenos de bici con potencia media registrada</div>';
+    html += '<div class="goal-empty">Faltan entrenos de bici con potencia media registrada</div>';
   }
   html += '</div>';
 
-  html += '<div>';
-  html += `<div style="font-size:12px;color:var(--text-mid);font-weight:600;margin-bottom:4px">🏊 Natación${trendBadge(trendSwim)}</div>`;
+  // ── NATACIÓN ──
+  html += '<div class="goal-block">';
+  html += `<div class="goal-head"><span class="goal-icon">🏊</span> Natación ${trendBadge(trendSwim)}</div>`;
   if (swimT) {
-    html += `<div class="prof-row"><span class="prof-label">Ritmo 500m</span><span class="prof-value">${swimT.pace500 ? secToPaceStr(swimT.pace500) + '/100m · ' + secToTimeStr(swimT.time500) : '—'}</span></div>`;
-    html += `<div class="prof-row"><span class="prof-label">Ritmo 1000m</span><span class="prof-value">${swimT.pace1000 ? secToPaceStr(swimT.pace1000) + '/100m · ' + secToTimeStr(swimT.time1000) : '—'}</span></div>`;
+    html += `<div class="goal-tiles">
+      <div class="goal-tile" style="border-color:rgba(14,165,233,.3)">
+        <div class="goal-v" style="color:var(--swim)">${swimT.pace500 ? secToPaceStr(swimT.pace500) : '—'}<span style="font-size:12px;color:var(--text-low)">/100m</span></div>
+        <div class="goal-sub">${swimT.time500 ? secToTimeStr(swimT.time500) : '—'}</div>
+        <div class="goal-l">Ritmo 500m</div>
+      </div>
+      <div class="goal-tile" style="border-color:rgba(14,165,233,.3)">
+        <div class="goal-v" style="color:var(--swim)">${swimT.pace1000 ? secToPaceStr(swimT.pace1000) : '—'}<span style="font-size:12px;color:var(--text-low)">/100m</span></div>
+        <div class="goal-sub">${swimT.time1000 ? secToTimeStr(swimT.time1000) : '—'}</div>
+        <div class="goal-l">Ritmo 1000m</div>
+      </div>
+    </div>`;
   } else {
-    html += '<div style="color:var(--text-low);font-size:12px;padding:4px 0">Faltan entrenos de natación con distancia y ritmo registrados</div>';
+    html += '<div class="goal-empty">Faltan entrenos de natación con distancia y ritmo registrados</div>';
   }
   html += '</div>';
 
