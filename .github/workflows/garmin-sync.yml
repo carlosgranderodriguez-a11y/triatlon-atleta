@@ -1,0 +1,30 @@
+name: Sincronizar Garmin de Nacho
+
+on:
+  schedule:
+    # Todos los días a las 06:00 UTC (~08:00 en España en verano, 07:00 en invierno)
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    # Permite lanzarlo a mano desde la pestaña "Actions" de GitHub, para probar
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el repo
+        uses: actions/checkout@v4
+
+      - name: Preparar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: pip install -r scripts/requirements.txt
+
+      - name: Ejecutar sincronización
+        run: python scripts/garmin_sync.py
+        env:
+          GARMIN_EMAIL: ${{ secrets.GARMIN_EMAIL }}
+          GARMIN_PASSWORD: ${{ secrets.GARMIN_PASSWORD }}
+          GARMIN_ATHLETE: ${{ secrets.GARMIN_ATHLETE }}
