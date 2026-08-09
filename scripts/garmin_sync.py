@@ -35,6 +35,14 @@ def safe(fn, label):
         return None
 
 
+def fmt_local_ts(ms):
+    """Convierte un timestamp 'Local' de Garmin (ms) a 'HH:MM'."""
+    if not ms:
+        return None
+    from datetime import datetime, timezone
+    return datetime.fromtimestamp(ms / 1000, tz=timezone.utc).strftime("%H:%M")
+
+
 def main():
     email = os.environ.get("GARMIN_EMAIL")
     password = os.environ.get("GARMIN_PASSWORD")
@@ -56,6 +64,12 @@ def main():
         dto = sleep.get("dailySleepDTO") or {}
         payload["sleep_score"] = (dto.get("sleepScores") or {}).get("overall", {}).get("value")
         payload["sleep_total_min"] = (dto.get("sleepTimeSeconds") or 0) // 60
+        payload["sleep_deep_min"]  = (dto.get("deepSleepSeconds") or 0) // 60
+        payload["sleep_light_min"] = (dto.get("lightSleepSeconds") or 0) // 60
+        payload["sleep_rem_min"]   = (dto.get("remSleepSeconds") or 0) // 60
+        payload["sleep_awake_min"] = (dto.get("awakeSleepSeconds") or 0) // 60
+        payload["sleep_start"] = fmt_local_ts(dto.get("sleepStartTimestampLocal") or dto.get("sleepStartTimestampGMT"))
+        payload["sleep_end"]   = fmt_local_ts(dto.get("sleepEndTimestampLocal") or dto.get("sleepEndTimestampGMT"))
 
     hrv = safe(lambda: client.get_hrv_data(d), "HRV")
     if hrv:
