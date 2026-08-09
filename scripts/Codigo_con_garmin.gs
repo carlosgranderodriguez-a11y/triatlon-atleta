@@ -571,7 +571,9 @@ function setAthletePassword(athleteId, password) {
 // ══════════════════════════════════════════════════════════════
 const GARMIN_HEADERS = [
   'id','athlete','fecha',
-  'sleep_score','sleep_total_min','hrv_last_night_avg','rhr',
+  'sleep_score','sleep_total_min','sleep_deep_min','sleep_light_min','sleep_rem_min','sleep_awake_min',
+  'sleep_start','sleep_end',
+  'hrv_last_night_avg','rhr',
   'body_battery_min','body_battery_max',
   'actividades_json','full_json'
 ];
