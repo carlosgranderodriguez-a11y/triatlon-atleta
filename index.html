@@ -619,6 +619,8 @@ input[type=range] {
       <input type="range" min="1" max="10" value="2" oninput="updateSlider('dolor',this.value)">
     </div>
 
+    <div id="w-garmin-hint" style="display:none;font-size:11px;color:var(--accent3);background:rgba(0,255,157,.08);border-radius:8px;padding:6px 10px;margin-bottom:10px">⌚ FC reposo, HRV y sueño prerrellenados desde Garmin — puedes ajustarlos si quieres.</div>
+
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div class="form-g"><label class="form-l">FC reposo (bpm)</label><input class="form-i" type="number" id="w-fc"></div>
       <div class="form-g"><label class="form-l">HRV rMSSD (ms)</label><input class="form-i" type="number" id="w-hrv"></div>
@@ -1610,6 +1612,35 @@ function renderWellnessPage() {
     document.getElementById('w-fc').value = existing.fc_rep || '';
     document.getElementById('w-hrv').value = existing.hrv || '';
     document.getElementById('w-notes').value = existing.notes || '';
+  }
+
+  // Autorrellenar FC reposo / HRV / sueño con el último dato de Garmin disponible,
+  // sin pisar nada que el atleta ya haya guardado manualmente hoy.
+  const garminLatest = (state.garmin || []).slice().sort((a, b) => b.fecha.localeCompare(a.fecha))[0];
+  if (garminLatest) {
+    const fcEl  = document.getElementById('w-fc');
+    const hrvEl = document.getElementById('w-hrv');
+    let autofilled = false;
+
+    if (fcEl && !fcEl.value && garminLatest.rhr) {
+      fcEl.value = garminLatest.rhr;
+      autofilled = true;
+    }
+    if (hrvEl && !hrvEl.value && garminLatest.hrv_last_night_avg) {
+      hrvEl.value = garminLatest.hrv_last_night_avg;
+      autofilled = true;
+    }
+    if (!existing && garminLatest.sleep_score) {
+      const suenoSlider = document.querySelector('input[oninput*="sueno"]');
+      if (suenoSlider) {
+        const suggested = Math.max(1, Math.min(10, Math.round(garminLatest.sleep_score / 10)));
+        suenoSlider.value = suggested;
+        updateSlider('sueno', suggested);
+        autofilled = true;
+      }
+    }
+    const hint = document.getElementById('w-garmin-hint');
+    if (hint) hint.style.display = autofilled ? '' : 'none';
   }
 
   // Historial
