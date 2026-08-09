@@ -2176,26 +2176,74 @@ function renderRecentResults() {
   if (!box) return;
   const discE = { swim:'🏊', bike:'🚴', run:'🏃', brick:'🔥', gym:'🏋' };
   const discColor = { swim:'var(--swim)', bike:'var(--bike)', run:'var(--run)', brick:'var(--accent)', gym:'var(--text-mid)' };
-  const recent = (state.workouts || [])
-    .filter(w => w.comp && (w.comp.dur || w.comp.dist) && w.fecha)
-    .sort((a,b) => b.fecha.localeCompare(a.fecha))
-    .slice(0, 8);
 
-  if (!recent.length) {
+  // 1) Entrenos registrados/planificados manualmente en la app
+  const fromWorkouts = (state.workouts || [])
+    .filter(w => w.comp && (w.comp.dur || w.comp.dist) && w.fecha)
+    .map(w => {
+      const dist = w.comp.dist ? (w.disc === 'swim' ? w.comp.dist + 'm' : w.comp.dist + 'km') : '';
+      const pace = w.comp.pace ? w.comp.pace + (w.disc === 'swim' ? '/100m' : '/km') : '';
+      return {
+        fecha: w.fecha,
+        icon: discE[w.disc] || '⚡',
+        color: discColor[w.disc] || 'var(--accent)',
+        main: w.comp.dur || dist || '—',
+        sub: [dist && w.comp.dur ? dist : '', pace].filter(Boolean).join(' · '),
+        badge: '',
+      };
+    });
+
+  // 2) Actividades sincronizadas automáticamente desde Garmin (cualquier deporte)
+  const garminTypeMap = {
+    running:              { icon: '🏃', color: 'var(--run)' },
+    treadmill_running:    { icon: '🏃', color: 'var(--run)' },
+    trail_running:        { icon: '🏔️', color: 'var(--run)' },
+    cycling:              { icon: '🚴', color: 'var(--bike)' },
+    road_biking:          { icon: '🚴', color: 'var(--bike)' },
+    mountain_biking:      { icon: '🚵', color: 'var(--bike)' },
+    indoor_cycling:       { icon: '🚴', color: 'var(--bike)' },
+    lap_swimming:         { icon: '🏊', color: 'var(--swim)' },
+    open_water_swimming:  { icon: '🏊', color: 'var(--swim)' },
+    strength_training:    { icon: '🏋', color: 'var(--text-mid)' },
+    fitness_equipment:    { icon: '🏋', color: 'var(--text-mid)' },
+    walking:              { icon: '🚶', color: 'var(--text-mid)' },
+    hiking:               { icon: '🥾', color: 'var(--accent)' },
+    multi_sport:          { icon: '🔥', color: 'var(--accent)' },
+  };
+  const fromGarmin = [];
+  (state.garmin || []).forEach(g => {
+    let acts = [];
+    try { acts = JSON.parse(g.actividades_json || '[]'); } catch(e) {}
+    acts.forEach(a => {
+      const meta = garminTypeMap[a.tipo] || { icon: '⌚', color: 'var(--accent)' };
+      const durMin  = a.dur_seg ? Math.round(a.dur_seg / 60) : null;
+      const distKm  = a.dist_m  ? (a.dist_m / 1000).toFixed(1) : null;
+      fromGarmin.push({
+        fecha: g.fecha,
+        icon: meta.icon,
+        color: meta.color,
+        main: durMin ? durMin + ' min' : (distKm ? distKm + ' km' : '—'),
+        sub: [distKm && durMin ? distKm + ' km' : '', a.pw_avg ? a.pw_avg + ' W' : '', a.fc_avg ? a.fc_avg + ' ppm' : ''].filter(Boolean).join(' · '),
+        badge: ' ⌚',
+      });
+    });
+  });
+
+  const all = fromWorkouts.concat(fromGarmin)
+    .sort((a, b) => b.fecha.localeCompare(a.fecha))
+    .slice(0, 10);
+
+  if (!all.length) {
     box.innerHTML = '<div class="goal-empty">Aún sin resultados registrados</div>';
     return;
   }
-  box.innerHTML = '<div class="res-strip">' + recent.map(w => {
-    const icon = discE[w.disc] || '⚡';
-    const color = discColor[w.disc] || 'var(--accent)';
-    const dist = w.comp.dist ? (w.disc === 'swim' ? w.comp.dist + 'm' : w.comp.dist + 'km') : '';
-    const pace = w.comp.pace ? w.comp.pace + (w.disc === 'swim' ? '/100m' : '/km') : '';
-    const fechaCorta = w.fecha ? w.fecha.slice(5).split('-').reverse().join('/') : '';
-    return `<div class="res-card" style="border-left-color:${color}">
-      <div class="res-icon">${icon}</div>
-      <div class="res-date">${fechaCorta}</div>
-      <div class="res-val">${w.comp.dur || dist || '—'}</div>
-      <div class="res-sub">${[dist && w.comp.dur ? dist : '', pace].filter(Boolean).join(' · ')}</div>
+  box.innerHTML = '<div class="res-strip">' + all.map(e => {
+    const fechaCorta = e.fecha ? e.fecha.slice(5).split('-').reverse().join('/') : '';
+    return `<div class="res-card" style="border-left-color:${e.color}">
+      <div class="res-icon">${e.icon}</div>
+      <div class="res-date">${fechaCorta}${e.badge}</div>
+      <div class="res-val">${e.main}</div>
+      <div class="res-sub">${e.sub}</div>
     </div>`;
   }).join('') + '</div>';
 }
