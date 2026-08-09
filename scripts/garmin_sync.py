@@ -21,7 +21,9 @@ import requests
 import garminconnect
 
 APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz5e_jS99e3xB-DJMbIEm3L_HXoS2rkED_o3n0_U6S2Ihnc9vJ2E0gUIcYukv4ZyVXI/exec"
-ATHLETE = "nacho"
+# El atleta también se controla por Secret (GARMIN_ATHLETE), así puedes probar
+# con tu propia cuenta ("CGR") antes de apuntar esto a la cuenta de Nacho.
+ATHLETE = os.environ.get("GARMIN_ATHLETE", "CGR")
 
 
 def safe(fn, label):
