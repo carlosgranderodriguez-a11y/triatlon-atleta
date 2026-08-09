@@ -427,6 +427,20 @@ input[type=range] {
 .power-bar-label { font-size: 10px; color: var(--text-low); margin-top: 8px; text-align: center; }
 .power-bar-empty { width: 100%; max-width: 46px; border-radius: 8px 8px 3px 3px; border: 1px dashed var(--border-mid); height: 14%; }
 
+/* ── GARMIN ── */
+.garmin-date { font-size: 11px; color: var(--text-low); margin-bottom: 10px; }
+.garmin-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+.garmin-tile {
+  background: rgba(255,255,255,.03); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 4px; text-align: center;
+}
+.garmin-tile .g-v { font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 18px; color: var(--text-hi); }
+.garmin-tile .g-l { font-size: 9px; color: var(--text-low); text-transform: uppercase; letter-spacing: .5px; margin-top: 4px; }
+.bb-row { margin-top: 4px; }
+.bb-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-mid); margin-bottom: 4px; }
+.bb-track { background: rgba(255,255,255,.06); border-radius: 8px; height: 12px; position: relative; overflow: hidden; }
+.bb-fill { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 8px; background: linear-gradient(90deg, var(--run), var(--accent3)); }
+
 /* ── HISTORY ── */
 .hist-day {
   margin-bottom: 14px;
@@ -550,6 +564,11 @@ input[type=range] {
   <div class="card" id="recent-coach-card" style="display:none">
     <div class="card-h"><span class="card-t">💬 Mensajes del coach</span></div>
     <div id="recent-coach-msgs"></div>
+  </div>
+
+  <div class="card" id="garmin-card" style="display:none">
+    <div class="card-h"><span class="card-t">⌚ Garmin</span></div>
+    <div id="garmin-content"></div>
   </div>
 
   <div class="card">
@@ -1192,6 +1211,7 @@ async function loadAllData() {
       state.calEvents = json.data.calEvents || [];
       state.workouts  = (json.data.workouts || []).map(normalizeWorkout);
       state.comments  = json.data.comments  || [];
+      state.garmin    = json.data.garmin    || [];
       // Refrescar profile
       if (json.data.athletes) {
         const me = json.data.athletes.find(a => a.id === state.athlete);
@@ -1442,6 +1462,50 @@ function renderTodayPage() {
 
   renderRecentResults();
   renderAutoTargets();
+  renderGarminCard();
+}
+
+function renderGarminCard() {
+  const card = document.getElementById('garmin-card');
+  const box  = document.getElementById('garmin-content');
+  if (!card || !box) return;
+
+  const rows = (state.garmin || []).slice().sort((a,b) => b.fecha.localeCompare(a.fecha));
+  if (!rows.length) { card.style.display = 'none'; return; }
+
+  const g = rows[0];
+  card.style.display = '';
+
+  const fechaCorta = g.fecha ? g.fecha.slice(5).split('-').reverse().join('/') : '';
+  const bbMin = Number(g.body_battery_min), bbMax = Number(g.body_battery_max);
+  const hasBB = !isNaN(bbMin) && !isNaN(bbMax);
+
+  let html = `<div class="garmin-date">Datos del ${fechaCorta}</div>`;
+  html += '<div class="garmin-tiles">';
+  html += `<div class="garmin-tile"><div class="g-v">${g.sleep_score ?? '—'}</div><div class="g-l">Sueño</div></div>`;
+  html += `<div class="garmin-tile"><div class="g-v">${g.hrv_last_night_avg ?? '—'}</div><div class="g-l">HRV ms</div></div>`;
+  html += `<div class="garmin-tile"><div class="g-v">${g.rhr ?? '—'}</div><div class="g-l">FC reposo</div></div>`;
+  html += '</div>';
+
+  if (hasBB) {
+    html += `<div class="bb-row">
+      <div class="bb-label"><span>🔋 Body Battery</span><span>${bbMin} – ${bbMax}</span></div>
+      <div class="bb-track"><div class="bb-fill" style="left:${bbMin}%;width:${Math.max(2, bbMax - bbMin)}%"></div></div>
+    </div>`;
+  }
+
+  let acts = [];
+  try { acts = JSON.parse(g.actividades_json || '[]'); } catch(e) {}
+  if (acts.length) {
+    html += '<div style="margin-top:12px;font-size:11px;color:var(--text-low)">Actividades ese día:</div>';
+    acts.forEach(a => {
+      const durMin = a.dur_seg ? Math.round(a.dur_seg/60) : null;
+      const distKm = a.dist_m ? (a.dist_m/1000).toFixed(1) : null;
+      html += `<div class="prof-row"><span class="prof-label">${a.tipo || '—'}</span><span class="prof-value">${[durMin && durMin+' min', distKm && distKm+' km', a.pw_avg && a.pw_avg+' W'].filter(Boolean).join(' · ')}</span></div>`;
+    });
+  }
+
+  box.innerHTML = html;
 }
 
 function renderWeekMini() {
