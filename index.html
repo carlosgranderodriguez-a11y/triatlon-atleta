@@ -1473,6 +1473,15 @@ function renderTodayPage() {
   renderGarminCard();
 }
 
+function fmtSleepTime(v) {
+  if (!v) return null;
+  const s = String(v);
+  if (/^\d{1,2}:\d{2}$/.test(s)) return s; // ya viene como "HH:MM"
+  const m = s.match(/T(\d{2}):(\d{2})/);    // Sheets lo devolvió como fecha completa
+  if (m) return m[1] + ':' + m[2];
+  return s;
+}
+
 function renderGarminCard() {
   const card = document.getElementById('garmin-card');
   const box  = document.getElementById('garmin-content');
@@ -1512,7 +1521,7 @@ function renderGarminCard() {
   if (totalStages > 0 || g.sleep_start) {
     html += '<div class="sleep-block">';
     if (g.sleep_start || g.sleep_end) {
-      html += `<div class="sleep-times"><span>🌙 ${g.sleep_start || '—'}</span><span>☀️ ${g.sleep_end || '—'}</span></div>`;
+      html += `<div class="sleep-times"><span>🌙 ${fmtSleepTime(g.sleep_start) || '—'}</span><span>☀️ ${fmtSleepTime(g.sleep_end) || '—'}</span></div>`;
     }
     if (totalStages > 0) {
       html += '<div class="sleep-stages-bar">' + sleepStages.map(st => {
