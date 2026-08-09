@@ -440,6 +440,12 @@ input[type=range] {
 .bb-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-mid); margin-bottom: 4px; }
 .bb-track { background: rgba(255,255,255,.06); border-radius: 8px; height: 12px; position: relative; overflow: hidden; }
 .bb-fill { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 8px; background: linear-gradient(90deg, var(--run), var(--accent3)); }
+.sleep-block { margin-top: 14px; }
+.sleep-times { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-mid); margin-bottom: 6px; }
+.sleep-stages-bar { display: flex; height: 14px; border-radius: 8px; overflow: hidden; background: rgba(255,255,255,.05); }
+.sleep-seg { height: 100%; }
+.sleep-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; font-size: 10px; color: var(--text-low); }
+.sleep-legend .dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
 
 /* ── HISTORY ── */
 .hist-day {
@@ -1492,6 +1498,34 @@ function renderGarminCard() {
       <div class="bb-label"><span>🔋 Body Battery</span><span>${bbMin} – ${bbMax}</span></div>
       <div class="bb-track"><div class="bb-fill" style="left:${bbMin}%;width:${Math.max(2, bbMax - bbMin)}%"></div></div>
     </div>`;
+  }
+
+  const sleepStages = [
+    { key: 'sleep_deep_min',  label: 'Profundo',  color: '#4c1d95' },
+    { key: 'sleep_light_min', label: 'Ligero',    color: '#38bdf8' },
+    { key: 'sleep_rem_min',   label: 'REM',       color: '#a78bfa' },
+    { key: 'sleep_awake_min', label: 'Despierto', color: '#ef4444' },
+  ];
+  const totalStages = sleepStages.reduce((s, st) => s + (Number(g[st.key]) || 0), 0);
+  if (totalStages > 0 || g.sleep_start) {
+    html += '<div class="sleep-block">';
+    if (g.sleep_start || g.sleep_end) {
+      html += `<div class="sleep-times"><span>🌙 ${g.sleep_start || '—'}</span><span>☀️ ${g.sleep_end || '—'}</span></div>`;
+    }
+    if (totalStages > 0) {
+      html += '<div class="sleep-stages-bar">' + sleepStages.map(st => {
+        const v = Number(g[st.key]) || 0;
+        const pct = v / totalStages * 100;
+        return pct > 0 ? `<div class="sleep-seg" style="width:${pct}%;background:${st.color}"></div>` : '';
+      }).join('') + '</div>';
+      html += '<div class="sleep-legend">' + sleepStages.map(st => {
+        const v = Number(g[st.key]) || 0;
+        if (!v) return '';
+        const h = Math.floor(v / 60), m = v % 60;
+        return `<span><span class="dot" style="background:${st.color}"></span>${st.label} ${h}h${String(m).padStart(2,'0')}</span>`;
+      }).join('') + '</div>';
+    }
+    html += '</div>';
   }
 
   let acts = [];
